@@ -96,6 +96,7 @@ public class StrutsMapper {
         List<String> fwdNames = new ArrayList<String>();
         List<String> fwdPrefixes = new ArrayList<String>();
         List<String> spArgs = new ArrayList<String>();
+        boolean writesResponse;
         List<String> procArgs = new ArrayList<String>();
         List<String> fwdPaths = new ArrayList<String>();
         List<String> sessionSet = new ArrayList<String>();
@@ -167,7 +168,7 @@ public class StrutsMapper {
 
     public static void main(String[] args) throws Exception {
         if (args.length < 1) {
-            System.out.println("Usage: java StrutsMapper <project-root> [output.html]");
+            System.out.println("Usage: java StrutsMapper <project-root> [output.html] [group-rules.txt]");
             return;
         }
         Path root = Paths.get(args[0]).toAbsolutePath().normalize();
@@ -189,6 +190,16 @@ public class StrutsMapper {
 
         long t0 = System.currentTimeMillis();
         StrutsMapper sm = new StrutsMapper(root);
+        String rulesArg = args.length > 2 ? args[2] : System.getProperty("sm.rules");
+        if (rulesArg != null) {
+            Path rf = Paths.get(rulesArg).toAbsolutePath().normalize();
+            if (!Files.exists(rf)) {
+                System.out.println("Group rules file not found: " + rf);
+                return;
+            }
+            sm.loadGroupRules(rf);
+            log("Group rules: " + sm.groupRules.size() + " from " + rf);
+        }
         sm.scanFiles();
         log("Files: xml=" + sm.xmlFiles.size() + " java=" + sm.javaFiles.size() + " jsp=" + sm.jspFiles.size());
         sm.parseXmls();
@@ -321,6 +332,96 @@ public class StrutsMapper {
         Path w = webRootOf(p);
         String r = (w != null ? w.relativize(p) : root.relativize(p)).toString().replace('\\', '/');
         return "/" + r;
+    }
+
+    // ------------------------------------------------------------------ group rules
+
+    /**
+     * Optional grouping rules, kept in a separate text file so the tool itself stays project-neutral.
+     * One rule per line, first match wins:   <type> <prefix> = <group label>
+     * types: package (action class), path (source / config file path, substring match),
+     *        url (action URL), module (struts module), sp (stored procedure name).
+     * "*" in a prefix matches one name segment and can be reused in the label as {1}, {2}...
+     */
+    static class GroupRule {
+        String type, label;
+        Pattern pattern;
+    }
+
+    static final Set<String> RULE_TYPES = new HashSet<String>(Arrays.asList("package", "path", "url", "module", "sp"));
+    final List<GroupRule> groupRules = new ArrayList<GroupRule>();
+
+    void loadGroupRules(Path f) {
+        int no = 0;
+        for (String raw : read(f).split("\\r?\\n")) {
+            no++;
+            String line = raw.trim();
+            if (line.isEmpty() || line.startsWith("#")) continue;
+            int eq = line.indexOf('=');
+            if (eq < 0) {
+                log("Rule line " + no + " ignored (no '='): " + line);
+                continue;
+            }
+            String left = line.substring(0, eq).trim();
+            String label = line.substring(eq + 1).trim();
+            int sp = left.indexOf(' ');
+            if (sp < 0 || label.isEmpty()) {
+                log("Rule line " + no + " ignored: " + line);
+                continue;
+            }
+            String type = left.substring(0, sp).trim().toLowerCase(Locale.ROOT);
+            String prefix = left.substring(sp + 1).trim().replace('\\', '/');
+            if (!RULE_TYPES.contains(type)) {
+                log("Rule line " + no + " ignored (unknown type '" + type + "'): " + line);
+                continue;
+            }
+            String seg = type.equals("package") || type.equals("sp") ? "([^.]+)" : "([^/]+)";
+            StringBuilder re = new StringBuilder();
+            String[] parts = prefix.split("\\*", -1);
+            for (int i = 0; i < parts.length; i++) {
+                if (i > 0) re.append(seg);
+                re.append(Pattern.quote(parts[i]));
+            }
+            GroupRule g = new GroupRule();
+            g.type = type;
+            g.label = label;
+            g.pattern = Pattern.compile(re.toString(), type.equals("sp") ? Pattern.CASE_INSENSITIVE : 0);
+            groupRules.add(g);
+        }
+    }
+
+    /** subjects: type -> values to test. Returns null when no rule matches. */
+    String groupOf(Map<String, List<String>> subjects) {
+        for (GroupRule g : groupRules) {
+            List<String> vals = subjects.get(g.type);
+            if (vals == null) continue;
+            for (String v : vals) {
+                if (v == null) continue;
+                Matcher m = g.pattern.matcher(v);
+                boolean ok = g.type.equals("path") ? m.find() : m.lookingAt();
+                if (!ok) continue;
+                String label = g.label;
+                for (int i = 1; i <= m.groupCount(); i++) label = label.replace("{" + i + "}", m.group(i));
+                return label;
+            }
+        }
+        return null;
+    }
+
+    static Map<String, List<String>> subj(String... kv) {
+        Map<String, List<String>> m = new HashMap<String, List<String>>();
+        for (int i = 0; i + 1 < kv.length; i += 2) {
+            List<String> l = m.get(kv[i]);
+            if (l == null) m.put(kv[i], l = new ArrayList<String>());
+            l.add(kv[i + 1]);
+        }
+        return m;
+    }
+
+    List<String> groupLabels() {
+        List<String> r = new ArrayList<String>();
+        for (GroupRule g : groupRules) if (!g.label.contains("{") && !r.contains(g.label)) r.add(g.label);
+        return r;
     }
 
     // ------------------------------------------------------------------ xml
@@ -642,7 +743,7 @@ public class StrutsMapper {
     }
 
     /**
-     * Frameworks such as eBao register struts-config files from Spring, e.g.
+     * Some frameworks register struts-config files from Spring, e.g.
      *   <bean class="...StrutsConfigExport">
      *     <property name="moduleName" value="/act"/>
      *     <property name="configFile"><list><value>/WEB-INF/.../struts-config-x.xml</value></list></property>
@@ -701,6 +802,7 @@ public class StrutsMapper {
     static final Pattern P_LOCAL = Pattern.compile("(?<![\\w$.])([A-Z][\\w$]*(?:\\.[A-Z][\\w$]*)*(?:\\s*\\[\\s*\\])*)\\s+([a-z_$][\\w$]*)\\s*(?=[=;:,)])");
     static final Pattern P_CAST_CALL = Pattern.compile("\\(\\s*\\(\\s*([A-Z][\\w$]*(?:\\.[\\w$]+)*)\\s*\\)");
     static final Pattern P_BEAN_ANNOT = Pattern.compile("@(?:Component|Controller|Service|Repository|Named)\\s*\\(\\s*(?:value\\s*=\\s*)?\"([^\"]+)\"");
+    static final Pattern P_WRITES = Pattern.compile("\\b(getWriter|getOutputStream)\\s*\\(");
     static final Pattern P_FIND_FWD = Pattern.compile("\\bfindForward\\s*\\(\\s*\"");
     static final Pattern P_NEW_FWD = Pattern.compile("\\bnew\\s+ActionForward\\s*\\(\\s*\"");
     static final Pattern P_ATTR = Pattern.compile("([\\w$.()]+?)\\s*\\.\\s*(setAttribute|getAttribute|removeAttribute)\\s*\\(\\s*\"");
@@ -1273,6 +1375,7 @@ public class StrutsMapper {
             JLit l = c.litMap.get(bs + fm.end() - 1);
             if (l != null) addU(jm.fwdPaths, l.value);
         }
+        if (P_WRITES.matcher(body).find()) jm.writesResponse = true;
         Matcher am = P_ATTR.matcher(body);
         while (am.find()) {
             JLit l = c.litMap.get(bs + am.end() - 1);
@@ -1482,7 +1585,7 @@ public class StrutsMapper {
     static class Reach {
         Map<String, Object[]> sps = new LinkedHashMap<String, Object[]>(); // name -> {kind, List<JMethod> path}
         Set<String> tables = new LinkedHashSet<String>();
-        boolean truncated;
+        boolean truncated, writes;
     }
 
     Reach reach(JMethod start, String rootFqn) {
@@ -1521,6 +1624,7 @@ public class StrutsMapper {
                 }
             }
             r.tables.addAll(m.tables);
+            if (m.writesResponse) r.writes = true;
             int d = depth.get(m);
             if (d >= MAX_DEPTH) continue;
             for (String[] call : m.calls) {
@@ -2022,11 +2126,14 @@ public class StrutsMapper {
             if (gl != null) for (Forward f : gl) global.put(f.name, f);
 
             Map<String, List<String>> usedBy = new LinkedHashMap<String, List<String>>();
+            boolean pageLike = !a.forwards.isEmpty() || a.fwdAttr != null || "forward".equals(kind);
+            boolean writes = false;
             List<Map<String, Object>> methodsOut = new ArrayList<Map<String, Object>>();
             if (jc != null) {
                 List<JMethod> sel = actionMethods(jc, kind, a.parameter);
                 if ("plain".equals(kind) && !sel.isEmpty() && !sel.get(0).name.equals("execute")) {
-                    kind = "custom";
+                    // one entry method called by the base class execute() = template method, several = custom dispatch
+                    kind = sel.size() == 1 ? "template" : "custom";
                     o.put("kind", kind);
                 }
                 Map<String, String> labels = new HashMap<String, String>();
@@ -2131,6 +2238,7 @@ public class StrutsMapper {
                         if (spo == null) {
                             spo = new LinkedHashMap<String, Object>();
                             spo.put("kind", e.getValue()[0]);
+                            if (!groupRules.isEmpty()) spo.put("group", groupOf(subj("sp", e.getKey())));
                             spo.put("callers", new ArrayList<Map<String, Object>>());
                             spo.put("jsps", new ArrayList<String>());
                             spOut.put(e.getKey(), spo);
@@ -2145,6 +2253,11 @@ public class StrutsMapper {
                     }
                     mo.put("sps", sps);
                     mo.put("tables", new ArrayList<String>(r.tables));
+                    if (r.writes) {
+                        writes = true;
+                        mo.put("writesResponse", true);
+                    }
+                    if (!jm.fwdNames.isEmpty() || !jm.fwdPaths.isEmpty()) pageLike = true;
                     if (r.truncated) mo.put("truncated", true);
                     Map<String, Object> sess = new LinkedHashMap<String, Object>();
                     sess.put("set", jm.sessionSet);
@@ -2155,6 +2268,11 @@ public class StrutsMapper {
                 }
             }
             o.put("methods", methodsOut);
+            o.put("nature", pageLike ? "page" : writes ? "response" : "none");
+            if (!groupRules.isEmpty()) {
+                o.put("group", groupOf(subj("package", clsName, "path", jc != null ? jc.file : null,
+                        "path", a.file, "url", urlOf(a.fullPath), "module", a.module)));
+            }
 
             List<Map<String, Object>> fwOut = new ArrayList<Map<String, Object>>();
             for (Forward f : a.forwards) {
@@ -2269,8 +2387,19 @@ public class StrutsMapper {
             if (s instanceof Integer && (Integer) s > 0) jspScr++;
         }
 
+        if (!groupRules.isEmpty()) {
+            for (Map.Entry<String, Map<String, Object>> e : jspInfo.entrySet()) {
+                Object f = e.getValue().get("file");
+                e.getValue().put("group", groupOf(subj("path", f == null ? e.getKey() : (String) f)));
+            }
+            for (Map.Entry<String, Map<String, Object>> e : spOut.entrySet()) {
+                if (!e.getValue().containsKey("group")) e.getValue().put("group", groupOf(subj("sp", e.getKey())));
+            }
+        }
+
         Map<String, Object> meta = new LinkedHashMap<String, Object>();
         meta.put("tool", "StrutsMapper " + TOOL_VERSION);
+        if (!groupRules.isEmpty()) meta.put("groups", groupLabels());
         meta.put("root", root.toString());
         meta.put("generatedAt", new SimpleDateFormat("yyyy-MM-dd HH:mm").format(new Date()));
         meta.put("actionPattern", actionPattern);

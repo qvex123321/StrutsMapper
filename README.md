@@ -102,6 +102,37 @@ java -cp . StrutsMapper "D:\workspace\target-project" "D:\struts-map\struts-map.
 - SP 是從字串辨識：`{call ...}`、`{? = call ...}`、`BEGIN ... END;`、以及 SQL 中的 `PKG.FUNCTION(...)`。透過常數組合的字串會一併展開；執行期才決定的部分會標示為動態。
 - 只支援 Struts 1，不支援 Struts 2。
 
+## 自訂分類（選用）
+
+預設依 Struts 模組分組。想改用自己的分類方式（例如依業務領域或維護團隊），可以另外寫一份規則檔，執行時當作第三個參數：
+
+```
+"D:\workspace\target-project" "D:\struts-map\struts-map.html" "D:\struts-map\group-rules.txt"
+```
+
+規則檔是純文字（UTF-8），一行一條規則，**由上往下比對，第一條符合的就採用**，所以範圍較小的規則要放前面：
+
+```
+# 類型 開頭 = 分類名稱
+package com.example.order.refund = 訂單-退款
+package com.example.order = 訂單
+url /admin/ = 後台管理
+sp PKG_ORDER_ = 訂單
+path modules/*/ = 其他：{1}
+```
+
+| 類型 | 比對對象 | 比對方式 |
+|---|---|---|
+| `package` | Action 類別的完整名稱 | 開頭相符 |
+| `path` | Action 類別或設定檔的路徑；JSP 的檔案路徑 | 路徑中包含 |
+| `url` | Action 的網址 | 開頭相符 |
+| `module` | Struts 模組名稱 | 開頭相符 |
+| `sp` | SP 名稱（不分大小寫） | 開頭相符 |
+
+`*` 代表一段名稱，可以在分類名稱中用 `{1}`、`{2}` 取出，例如上面最後一行會把 `modules/billing/` 底下的檔案分到「其他：billing」。
+
+使用規則檔時，左側的篩選選單會改成依分類篩選，總覽頁也會改為各分類的統計。規則檔是專案專屬的設定，建議和工具分開保存。
+
 ## 選項
 
 在 VM arguments 加上：

@@ -52,6 +52,12 @@ button{font:inherit;color:inherit}
 .tabs button.on{color:var(--ink);border-bottom-color:var(--ink);font-weight:600}
 .tabs .cnt{font-family:var(--mono);font-size:11px;color:var(--faint);margin-left:3px}
 .list{overflow:auto;flex:1;padding:6px 0}
+.filters{display:flex;gap:6px;padding:8px 8px;border-bottom:1px solid var(--line)}
+.filters select{flex:1;min-width:0;height:30px;padding:0 8px;border:1px solid var(--line2);border-radius:7px;background:var(--panel2);color:var(--ink);font:inherit;font-size:12.5px;outline:none}
+.filters select:focus{border-color:var(--act)}
+.filters select.on{border-color:var(--act);color:var(--act)}
+.grp{position:sticky;top:-6px;z-index:1;display:flex;justify-content:space-between;padding:6px 14px 5px;background:var(--panel2);border-bottom:1px solid var(--line);border-top:1px solid var(--line);font-family:var(--mono);font-size:12px;font-weight:600;color:var(--muted)}
+.grp span{font-weight:400;color:var(--faint)}
 .row{display:block;padding:8px 14px;border-left:3px solid transparent;cursor:pointer}
 .row:hover{background:var(--hover)}
 .row.on{background:var(--sel);border-left-color:var(--act)}
@@ -189,6 +195,15 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
       <button data-tab="jsp">JSP<span class="cnt"></span></button>
       <button data-tab="warn">警告<span class="cnt"></span></button>
     </nav>
+    <div class="filters">
+      <select id="mod" title="依 Struts 模組篩選"></select>
+      <select id="nat" title="依 Action 性質篩選">
+        <option value="">全部 Action</option>
+        <option value="page">畫面</option>
+        <option value="nonpage">非畫面（AJAX、下載等）</option>
+        <option value="orphan">沒有被任何畫面呼叫</option>
+      </select>
+    </div>
     <div class="list" id="list"></div>
   </aside>
   <main class="main" id="main"></main>
@@ -210,7 +225,7 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
 
   var KIND = {
     dispatch: 'DispatchAction', lookup: 'LookupDispatchAction', mapping: 'MappingDispatchAction', event: 'EventDispatchAction',
-    plain: 'Action', custom: '自訂分派（推測）', forward: '直接轉向', include: '直接 include', builtin: 'Struts 內建', missing: '找不到原始碼', jar: '位於 jar（無原始碼）', unknown: '未指定類別'
+    plain: 'Action', template: '樣板方法', custom: '自訂分派（推測）', forward: '直接轉向', include: '直接 include', builtin: 'Struts 內建', missing: '找不到原始碼', jar: '位於 jar（無原始碼）', unknown: '未指定類別'
   };
   var WARN = {
     'fwd-undefined': ['程式使用了未定義的 forward', '程式碼呼叫 findForward() 的名稱，在該 Action 和 global-forwards 都找不到，執行時會回傳 null。'],
@@ -264,6 +279,40 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
   var warns = D.warnings || [];
   warns.forEach(function (w) { w._s = JSON.stringify(w).toLowerCase(); });
 
+  // modules & action nature
+  var NATURE = { page: '畫面', response: '非畫面：直接輸出回應', none: '非畫面：沒有轉向' };
+  var targetedBy = {};
+  // with group rules: filter by group label; otherwise by struts module
+  var GROUPED = !!(D.meta && D.meta.groups);
+  actions.forEach(function (a) {
+    a._mod = GROUPED ? (a.group || '') : (a.module || '');
+    var mark = function (t) { if (t && t.kind === 'action' && t.action && t.action !== a.id) targetedBy[t.action] = 1; };
+    (a.forwards || []).forEach(function (f) { mark(f.target); });
+    (a.methods || []).forEach(function (m) { (m.forwards || []).forEach(function (f) { mark(f.target); }); (m.paths || []).forEach(function (p) { mark(p.target); }); });
+    mark(a.forwardAttr);
+  });
+  actions.forEach(function (a) { a._orphan = !(a.sources || []).length && !targetedBy[a.id]; });
+  var modCount = {};
+  actions.forEach(function (a) { modCount[a._mod] = (modCount[a._mod] || 0) + 1; });
+  var modules = Object.keys(modCount).sort(function (x, y) {
+    if (GROUPED) {
+      var gi = D.meta.groups, ix = gi.indexOf(x), iy = gi.indexOf(y);
+      if (x === '') return 1; if (y === '') return -1;
+      if (ix >= 0 || iy >= 0) return (ix < 0 ? 1e9 : ix) - (iy < 0 ? 1e9 : iy);
+    }
+    return x < y ? -1 : x > y ? 1 : 0;
+  });
+  spNames.forEach(function (n) { var m = {}; if (GROUPED && D.sps[n].group) m[D.sps[n].group] = 1; D.sps[n].callers.forEach(function (c) { if (byId[c.action]) m[byId[c.action]._mod] = 1; }); D.sps[n]._mods = m; });
+  jspPaths.forEach(function (p) {
+    var j = D.jsps[p], m = {};
+    if (GROUPED && j.group) m[j.group] = 1;
+    (j.forwardedFrom || []).forEach(function (f) { if (byId[f.action]) m[byId[f.action]._mod] = 1; });
+    (j.submits || []).forEach(function (id) { if (byId[id]) m[byId[id]._mod] = 1; });
+    j._mods = m;
+  });
+  warns.forEach(function (w) { w._mod = w.action && byId[w.action] ? byId[w.action]._mod : null; });
+  var modLabel = function (m) { return m || (GROUPED ? '（未分類）' : '（預設模組）'); };
+
   // ---------- helpers ----------
   var toastEl = document.getElementById('toast'), toastT;
   function toast(msg) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(function () { toastEl.classList.remove('show'); }, 1400); }
@@ -304,6 +353,7 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
   }
   function kindBadge(a) {
     var k = KIND[a.kind] || a.kind;
+    if (a.kind === 'template') k = '由 ' + (a.base || '基底類別') + '.execute() 呼叫';
     var cls = a.kind === 'missing' || a.kind === 'unknown' ? 'b bad' : (a.kind === 'custom' || a.kind === 'jar' ? 'b warn' : 'b act');
     return '<span class="' + cls + '">' + esc(k) + '</span>';
   }
@@ -335,7 +385,21 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
   Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) { b.querySelector('.cnt').textContent = counts[b.dataset.tab]; });
 
   // ---------- sidebar ----------
-  var state = { tab: 'action', q: '', cur: '' };
+  var state = { tab: 'action', q: '', cur: '', mod: null, nat: '' };
+  try { var saved = JSON.parse(localStorage.getItem('struts-map-filters') || '{}'); if (saved.mod != null && modCount[saved.mod] != null) state.mod = saved.mod; state.nat = saved.nat || ''; } catch (e) { }
+  function saveFilters() { try { localStorage.setItem('struts-map-filters', JSON.stringify({ mod: state.mod, nat: state.nat })); } catch (e) { } }
+  function inMod(item) {
+    if (state.mod == null) return true;
+    if (item._mod !== undefined) return item._mod === state.mod;
+    return !!(item._mods && item._mods[state.mod]);
+  }
+  function natOk(a) {
+    if (!state.nat) return true;
+    if (state.nat === 'page') return a.nature === 'page';
+    if (state.nat === 'nonpage') return a.nature !== 'page';
+    if (state.nat === 'orphan') return a._orphan;
+    return true;
+  }
   var listEl = document.getElementById('list');
   var qEl = document.getElementById('q');
   var LIMIT = 400;
@@ -346,20 +410,28 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
     var terms = state.q.toLowerCase().split(/\s+/).filter(Boolean);
     var html = [], n = 0, total = 0;
     var push = function (h) { total++; if (n < LIMIT) { html.push(h); n++; } };
+    var list = [];
     if (state.tab === 'action') {
-      actions.forEach(function (a) {
-        if (terms.length && !match(a._s, terms)) return;
+      var shown = actions.filter(function (a) { return inMod(a) && natOk(a) && (!terms.length || match(a._s, terms)); });
+      var group = state.mod == null && modules.length > 1;
+      if (group) shown = shown.slice().sort(function (x, y) { return modules.indexOf(x._mod) - modules.indexOf(y._mod); });
+      var gcount = {};
+      shown.forEach(function (a) { gcount[a._mod] = (gcount[a._mod] || 0) + 1; });
+      var lastMod = null;
+      shown.forEach(function (a) {
+        if (group && a._mod !== lastMod && n < LIMIT) { html.push('<div class="grp">' + esc(modLabel(a._mod)) + '<span>' + gcount[a._mod] + '</span></div>'); lastMod = a._mod; }
         var key = 'action/' + a.id;
         var ms = (a.methods || []).length, sps = Object.keys(a._sp).length;
         push('<a class="row' + (state.cur === key ? ' on' : '') + '" href="#action/' + enc(a.id) + '"><div class="r1">' + esc(a.url) + '</div><div class="r2">' +
           '<span>' + esc(short(a.cls) || KIND[a.kind] || '') + '</span>' +
           (ms ? '<span>· ' + ms + ' 方法</span>' : '') + (sps ? '<span>· ' + sps + ' SP</span>' : '') +
-          (a.kind === 'missing' ? '<span class="b bad">無原始碼</span>' : '') + (a.kind === 'jar' ? '<span class="b warn">jar</span>' : '') + '</div></a>');
+          (a.kind === 'missing' ? '<span class="b bad">無原始碼</span>' : '') + (a.kind === 'jar' ? '<span class="b warn">jar</span>' : '') +
+          (a.nature && a.nature !== 'page' ? '<span class="b">非畫面</span>' : '') + '</div></a>');
       });
     } else if (state.tab === 'sp') {
       spNames.forEach(function (nm) {
         var s = D.sps[nm];
-        if (terms.length && !match(s._s, terms)) return;
+        if (!inMod(s) || (terms.length && !match(s._s, terms))) return;
         var key = 'sp/' + nm;
         push('<a class="row' + (state.cur === key ? ' on' : '') + '" href="#sp/' + enc(nm) + '"><div class="r1">' + esc(spName(nm)) + '</div><div class="r2">' +
           '<span>' + s._acts + ' 個 Action</span>' + (s.jsps.length ? '<span>· ' + s.jsps.length + ' 個 JSP 直接呼叫</span>' : '') +
@@ -368,7 +440,7 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
     } else if (state.tab === 'jsp') {
       jspPaths.forEach(function (p) {
         var j = D.jsps[p];
-        if (terms.length && !match(j._s, terms)) return;
+        if (!inMod(j) || (terms.length && !match(j._s, terms))) return;
         var key = 'jsp/' + p;
         var from = (j.forwardedFrom || []).length;
         push('<a class="row' + (state.cur === key ? ' on' : '') + '" href="#jsp/' + enc(p) + '"><div class="r1">' + esc(p) + '</div><div class="r2">' +
@@ -379,13 +451,14 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
       });
     } else {
       warns.forEach(function (w, i) {
-        if (terms.length && !match(w._s, terms)) return;
+        if ((state.mod != null && w._mod !== state.mod) || (terms.length && !match(w._s, terms))) return;
         var t = warnText(w);
         var href = t.action ? '#action/' + enc(t.action.id) : '#warn';
         push('<a class="row" href="' + href + '"><div class="r1" style="font-family:var(--sans)">' + esc(t.title) + '</div><div class="r2">' +
           (t.action ? '<span class="mono">' + esc(t.action.url) + '</span>' : '') + '<span>' + t.detail.replace(/<span class="loc"[^>]*>|<\/span>/g, '') + '</span></div></a>');
       });
     }
+    document.getElementById('nat').style.display = state.tab === 'action' ? '' : 'none';
     if (!total) html.push('<div class="more">沒有符合的項目</div>');
     else if (total > n) html.push('<div class="more">還有 ' + (total - n) + ' 筆，請輸入更多關鍵字縮小範圍</div>');
     listEl.innerHTML = html.join('');
@@ -401,6 +474,26 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
     setTab(b.dataset.tab);
     if (b.dataset.tab === 'warn') location.hash = '#warn';
   });
+  var modEl = document.getElementById('mod'), natEl = document.getElementById('nat');
+  modEl.title = GROUPED ? '依分類篩選' : '依 Struts 模組篩選';
+  modEl.innerHTML = '<option value="*">' + (GROUPED ? '全部分類' : '全部模組') + '（' + modules.length + '）</option>' + modules.map(function (m) { return '<option value="' + esc(m) + '">' + esc(modLabel(m)) + '　' + modCount[m] + '</option>'; }).join('');
+  function syncFilters() {
+    modEl.value = state.mod == null ? '*' : state.mod; modEl.classList.toggle('on', state.mod != null);
+    natEl.value = state.nat; natEl.classList.toggle('on', !!state.nat);
+  }
+  function setModule(m) { state.mod = m; saveFilters(); syncFilters(); renderList(); listEl.scrollTop = 0; }
+  modEl.addEventListener('change', function () { setModule(modEl.value === '*' ? null : modEl.value); });
+  natEl.addEventListener('change', function () { state.nat = natEl.value; saveFilters(); syncFilters(); if (state.tab !== 'action') setTab('action'); else renderList(); listEl.scrollTop = 0; });
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-module]');
+    if (!b) return;
+    e.preventDefault();
+    setModule(b.getAttribute('data-module'));
+    if (state.tab !== 'action') setTab('action');
+  });
+  syncFilters();
+  if (modules.length < 2) modEl.style.display = 'none';
+
   var qT;
   qEl.addEventListener('input', function () { clearTimeout(qT); qT = setTimeout(function () { state.q = qEl.value.trim(); renderList(); listEl.scrollTop = 0; }, 80); });
   document.addEventListener('keydown', function (e) {
@@ -429,6 +522,18 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
       stat(c.javaClasses, 'Java 類別') +
       stat(c.warnings, '警告') + '</div>');
 
+    if (modules.length > 1) {
+      var ms = {};
+      modules.forEach(function (m) { ms[m] = { a: 0, page: 0, non: 0, orphan: 0, sp: {}, w: 0 }; });
+      actions.forEach(function (a) { var x = ms[a._mod]; x.a++; if (a.nature === 'page') x.page++; else x.non++; if (a._orphan) x.orphan++; Object.keys(a._sp).forEach(function (n) { x.sp[n] = 1; }); });
+      warns.forEach(function (w) { if (w._mod != null && ms[w._mod]) ms[w._mod].w++; });
+      h.push('<h2>' + (GROUPED ? '各分類' : '各模組') + ' <span class="n">點選名稱可篩選左側清單</span></h2><table class="t"><tr><th>' + (GROUPED ? '分類' : '模組') + '</th><th style="text-align:right">Action</th><th style="text-align:right">畫面</th><th style="text-align:right">非畫面</th><th style="text-align:right">沒有被呼叫</th><th style="text-align:right">SP</th><th style="text-align:right">警告</th></tr>');
+      modules.slice().sort(function (x, y) { return ms[y].a - ms[x].a; }).forEach(function (m) {
+        var x = ms[m];
+        h.push('<tr class="click" data-module="' + esc(m) + '"><td class="mono">' + esc(modLabel(m)) + '</td><td class="num">' + x.a + '</td><td class="num">' + x.page + '</td><td class="num">' + x.non + '</td><td class="num">' + x.orphan + '</td><td class="num">' + Object.keys(x.sp).length + '</td><td class="num">' + x.w + '</td></tr>');
+      });
+      h.push('</table>');
+    }
     var top = spNames.slice(0, 15);
     if (top.length) {
       h.push('<h2>被最多 Action 使用的 SP <span class="n">前 ' + top.length + ' 名</span></h2><table class="t"><tr><th>SP</th><th>類型</th><th style="text-align:right">Action 數</th><th style="text-align:right">呼叫處</th></tr>');
@@ -476,9 +581,9 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
 
   function viewAction(a) {
     var h = [];
-    h.push('<div class="eyebrow">ACTION' + (a.module ? '　模組 ' + esc(a.module) : '') + '</div>');
+    h.push('<div class="eyebrow">ACTION' + (a.module ? '　模組 ' + esc(a.module) : '') + (a.group ? '　分類 ' + esc(a.group) : '') + '</div>');
     h.push('<h1 class="mono">' + esc(a.url) + '</h1>');
-    h.push('<div class="sub">' + kindBadge(a) + sessionBadge(a) + (a.proxy ? '<span class="b">Spring 代理</span>' : '') + (!a.registered ? '<span class="b bad">設定檔未註冊</span>' : '') +
+    h.push('<div class="sub">' + kindBadge(a) + (a.nature && a.nature !== 'page' ? '<span class="b" title="沒有轉向任何畫面，通常是 AJAX、下載或背景處理用的 Action">' + esc(NATURE[a.nature]) + '</span>' : '') + (a._orphan ? '<span class="b warn" title="沒有任何 JSP 或 Action 參照這個 URL，可能是已不用的功能，或由 JavaScript 動態組出網址">沒有被畫面呼叫</span>' : '') + sessionBadge(a) + (a.proxy ? '<span class="b">Spring 代理</span>' : '') + (!a.registered ? '<span class="b bad">設定檔未註冊</span>' : '') +
       (a.cls ? '<span class="mono">' + esc(a.cls) + '</span>' + (a.clsFile ? loc(a.clsFile, a.clsLine) : '') : '') + '</div>');
 
     var attr = function (k, v) { return '<div class="attr"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>'; };
