@@ -1,0 +1,744 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Struts 對應表</title>
+<style>
+:root{
+  --bg:#f4f3ef; --panel:#ffffff; --panel2:#f9f8f5; --ink:#1b1d21; --muted:#62666e; --faint:#9a9da4;
+  --line:#e2e0d9; --line2:#cfccc3; --hover:#efede7; --sel:#e6ecf8;
+  --act:#2350b0; --act-bg:#e9eefb; --sp:#9c3d0d; --sp-bg:#fbede3; --jsp:#0c6b60; --jsp-bg:#e3f2ef;
+  --warn:#8a5d00; --warn-bg:#fbf1d6; --bad:#b0261b; --bad-bg:#fbe9e7; --ok:#2f6b2f;
+  --edge:#b9b5ab; --edge-hi:#2350b0;
+  --mono: Consolas, "Cascadia Mono", "JetBrains Mono", Menlo, monospace;
+  --sans: "Microsoft JhengHei UI", "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#15171a; --panel:#1c1f23; --panel2:#202328; --ink:#e7e5e0; --muted:#a2a5ab; --faint:#6f737a;
+    --line:#2d3137; --line2:#3a3f46; --hover:#252930; --sel:#22304a;
+    --act:#8fb0f5; --act-bg:#1f2a40; --sp:#f0a578; --sp-bg:#3a2518; --jsp:#6fd0c0; --jsp-bg:#173430;
+    --warn:#e8c068; --warn-bg:#3a2f14; --bad:#f08a80; --bad-bg:#3d1d1a; --ok:#8fcf8f;
+    --edge:#4a4f57; --edge-hi:#8fb0f5;
+    color-scheme: dark;
+  }
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.mono{font-family:var(--mono);font-size:.93em}
+button{font:inherit;color:inherit}
+
+/* top bar */
+.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:16px;height:54px;padding:0 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:10px;white-space:nowrap;cursor:pointer}
+.brand b{font-size:15px;letter-spacing:.02em}
+.brand .proj{color:var(--muted);font-family:var(--mono);font-size:12px;max-width:28vw;overflow:hidden;text-overflow:ellipsis}
+.search{flex:1;max-width:560px;position:relative}
+.search input{width:100%;height:34px;padding:0 12px 0 32px;border:1px solid var(--line2);border-radius:8px;background:var(--panel2);color:var(--ink);font:inherit;outline:none}
+.search input:focus{border-color:var(--act);background:var(--panel)}
+.search svg{position:absolute;left:10px;top:10px;width:14px;height:14px;stroke:var(--faint)}
+.search kbd{position:absolute;right:8px;top:7px;font:11px var(--mono);color:var(--faint);border:1px solid var(--line2);border-radius:4px;padding:1px 5px}
+.gen{margin-left:auto;color:var(--faint);font-size:12px;white-space:nowrap}
+
+/* layout */
+.layout{display:grid;grid-template-columns:340px minmax(0,1fr);height:calc(100vh - 54px)}
+.side{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+.tabs{display:flex;gap:2px;padding:8px 8px 0;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;border:0;background:none;padding:7px 4px 9px;border-bottom:2px solid transparent;color:var(--muted);cursor:pointer;font-size:13px}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--ink);font-weight:600}
+.tabs .cnt{font-family:var(--mono);font-size:11px;color:var(--faint);margin-left:3px}
+.list{overflow:auto;flex:1;padding:6px 0}
+.row{display:block;padding:8px 14px;border-left:3px solid transparent;cursor:pointer}
+.row:hover{background:var(--hover)}
+.row.on{background:var(--sel);border-left-color:var(--act)}
+.row .r1{font-family:var(--mono);font-size:13px;word-break:break-all}
+.row .r2{color:var(--muted);font-size:12px;margin-top:1px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.more{padding:10px 14px;color:var(--faint);font-size:12px}
+.main{overflow:auto;min-width:0}
+.page{max-width:1180px;padding:24px 28px 80px}
+
+/* type */
+.eyebrow{font-size:12px;color:var(--faint);letter-spacing:.06em;margin-bottom:4px}
+h1{font-size:22px;margin:0 0 6px;font-weight:650;word-break:break-all}
+h1.mono{font-size:20px}
+h2{font-size:14px;margin:32px 0 10px;font-weight:650;display:flex;align-items:baseline;gap:8px}
+h2 .n{font-weight:400;color:var(--faint);font-size:12px;font-family:var(--mono)}
+.sub{color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;font-size:13px}
+.muted{color:var(--muted)}
+.faint{color:var(--faint)}
+.empty{color:var(--faint);padding:40px;text-align:center}
+
+/* badges, pills */
+.b{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;line-height:18px;padding:0 7px;border-radius:9px;background:var(--hover);color:var(--muted);white-space:nowrap}
+.b.act{background:var(--act-bg);color:var(--act)}
+.b.sp{background:var(--sp-bg);color:var(--sp)}
+.b.jsp{background:var(--jsp-bg);color:var(--jsp)}
+.b.warn{background:var(--warn-bg);color:var(--warn)}
+.b.bad{background:var(--bad-bg);color:var(--bad)}
+.pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12.5px;padding:2px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel);cursor:pointer;max-width:100%;word-break:break-all}
+.pill:hover{border-color:var(--line2);background:var(--hover)}
+.pill.sp{color:var(--sp)}
+.pill.jsp{color:var(--jsp)}
+.pill.act{color:var(--act)}
+.pill.static{cursor:default}
+.pill.static:hover{background:var(--panel);border-color:var(--line)}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.loc{font-family:var(--mono);font-size:12px;color:var(--faint);cursor:copy;border-bottom:1px dotted transparent}
+.loc:hover{color:var(--muted);border-bottom-color:var(--faint)}
+
+/* cards */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.attrs{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:0;padding:4px 0}
+.attr{padding:10px 16px;border-bottom:1px solid var(--line);min-width:0}
+.attr .k{font-size:11.5px;color:var(--faint);margin-bottom:2px}
+.attr .v{word-break:break-all}
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:18px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.stat .v{font-size:24px;font-weight:650;font-family:var(--mono);letter-spacing:-.02em}
+.stat .k{font-size:12px;color:var(--muted)}
+.stat .h{font-size:11.5px;color:var(--faint);margin-top:2px}
+
+/* tables */
+table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.t th,.t td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+.t th{font-size:12px;font-weight:600;color:var(--muted);background:var(--panel2)}
+.t tr:last-child td{border-bottom:0}
+.t td.num{font-family:var(--mono);text-align:right;width:1%;white-space:nowrap}
+.t tr.click{cursor:pointer}
+.t tr.click:hover td{background:var(--hover)}
+
+/* flow */
+.flow{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0 44px;padding:16px 18px 18px}
+.flow svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.flow path{fill:none;stroke:var(--edge);stroke-width:1.3;transition:stroke .12s,opacity .12s}
+.flow path.on{stroke:var(--edge-hi);stroke-width:2}
+.flow path.off{opacity:.18}
+.col{display:flex;flex-direction:column;gap:8px;min-width:0;position:relative;z-index:1}
+.colh{font-size:11.5px;color:var(--faint);letter-spacing:.05em;margin-bottom:2px}
+.node{border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:6px 9px;font-family:var(--mono);font-size:12.5px;word-break:break-all;cursor:pointer;transition:opacity .12s,border-color .12s}
+.node:hover{border-color:var(--line2)}
+.node .s{display:block;font-family:var(--sans);font-size:11px;color:var(--faint);margin-top:1px}
+.node.act-h{background:var(--act-bg);border-color:transparent;color:var(--act);font-weight:600}
+.node.m{border-left:3px solid var(--act)}
+.node.sp{border-left:3px solid var(--sp)}
+.node.jsp{border-left:3px solid var(--jsp)}
+.node.tg-action{border-left:3px solid var(--act)}
+.node.tg-other{border-left:3px solid var(--faint)}
+.node.unused{border-style:dashed;color:var(--faint)}
+.node.off{opacity:.3}
+.node.on{border-color:var(--edge-hi)}
+.node.none{border-style:dashed;color:var(--faint);cursor:default;font-family:var(--sans)}
+
+/* method cards */
+.mcards{display:flex;flex-direction:column;gap:12px}
+.mcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;scroll-margin-top:16px}
+.mcard.flash{animation:flash 1.2s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--act-bg)}100%{box-shadow:0 0 0 0 transparent}}
+.mhead{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;padding:11px 16px;border-bottom:1px solid var(--line)}
+.mhead .mn{font-family:var(--mono);font-weight:650;font-size:14px}
+.mhead .hint{font-family:var(--mono);font-size:12px;color:var(--muted);margin-left:auto;word-break:break-all}
+.mrow{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;padding:9px 16px;border-bottom:1px solid var(--line)}
+.mrow:last-child{border-bottom:0}
+.mrow .k{font-size:12px;color:var(--faint);padding-top:3px}
+.spitem{display:flex;flex-direction:column;gap:3px;margin-bottom:8px}
+.spitem:last-child{margin-bottom:0}
+.via{display:flex;flex-wrap:wrap;align-items:center;gap:2px 4px;font-family:var(--mono);font-size:11.5px;color:var(--muted);padding-left:2px}
+.via .arr{color:var(--faint)}
+.via span[title]{cursor:copy}
+.via span[title]:hover{color:var(--ink)}
+.arrow{color:var(--faint);margin:0 2px}
+
+.note{font-size:12.5px;color:var(--muted);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin-top:10px}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:7px 14px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
+.toast.show{opacity:1}
+
+@media (max-width: 860px){
+  .layout{grid-template-columns:1fr;height:auto}
+  .side{max-height:42vh;border-right:0;border-bottom:1px solid var(--line)}
+  .page{padding:18px 16px 60px}
+  .flow{grid-template-columns:1fr;gap:16px}
+  .flow svg{display:none}
+  .gen,.brand .proj{display:none}
+  .mrow{grid-template-columns:1fr;gap:4px}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="#overview"><b>Struts 對應表</b><span class="proj" id="proj"></span></a>
+  <div class="search">
+    <svg viewBox="0 0 16 16" fill="none" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
+    <input id="q" type="search" autocomplete="off" spellcheck="false" placeholder="搜尋 URL、類別、方法、SP、JSP、資料表">
+    <kbd>/</kbd>
+  </div>
+  <div class="gen" id="gen"></div>
+</header>
+<div class="layout">
+  <aside class="side">
+    <nav class="tabs" id="tabs">
+      <button data-tab="action">Action<span class="cnt"></span></button>
+      <button data-tab="sp">SP<span class="cnt"></span></button>
+      <button data-tab="jsp">JSP<span class="cnt"></span></button>
+      <button data-tab="warn">警告<span class="cnt"></span></button>
+    </nav>
+    <div class="list" id="list"></div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+<div class="toast" id="toast"></div>
+<script id="data" type="application/json">__STRUTS_MAP_DATA__</script>
+<script>
+(function () {
+  'use strict';
+  var main = document.getElementById('main');
+  var D;
+  try { D = JSON.parse(document.getElementById('data').textContent); }
+  catch (e) { main.innerHTML = '<div class="empty">這是範本檔，請用 StrutsMapper 產生對應表。</div>'; return; }
+
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var enc = encodeURIComponent;
+  var short = function (fqn) { return fqn ? String(fqn).split('.').pop() : ''; };
+  var spName = function (n) { return n === '(dynamic)' ? '（動態組成的呼叫）' : n; };
+
+  var KIND = {
+    dispatch: 'DispatchAction', lookup: 'LookupDispatchAction', mapping: 'MappingDispatchAction', event: 'EventDispatchAction',
+    plain: 'Action', custom: '自訂分派（推測）', forward: '直接轉向', include: '直接 include', builtin: 'Struts 內建', missing: '找不到原始碼', unknown: '未指定類別'
+  };
+  var WARN = {
+    'fwd-undefined': ['程式使用了未定義的 forward', '程式碼呼叫 findForward() 的名稱，在該 Action 和 global-forwards 都找不到，執行時會回傳 null。'],
+    'target-missing': ['forward 目標不存在', 'forward 指向的 JSP 檔案或 Tiles 定義找不到。'],
+    'class-missing': ['找不到 Action 原始碼', 'struts-config 指定的類別不在掃描到的原始碼中，可能在 jar 裡或已被刪除。'],
+    'bean-missing': ['找不到 Spring bean', '使用 DelegatingActionProxy，但 Spring 設定中沒有對應 path 名稱的 bean。'],
+    'form-missing': ['找不到 form-bean', 'Action 指定的 name 在 form-beans 中沒有定義。'],
+    'sp-dynamic': ['SP 名稱為動態組成', '呼叫字串是拼接出來的，工具無法確定實際呼叫哪支程序，需要人工確認。'],
+    'config-unregistered': ['設定檔未在 web.xml 註冊', '這份 struts-config 沒有被 ActionServlet 載入，可能是遺留檔案。'],
+    'dup-action': ['Action path 重複定義', '同一個 path 出現在多份設定檔中。'],
+    'xml-parse': ['XML 解析失敗', '檔案格式有誤，已略過。'],
+    'java-parse': ['Java 解析失敗', '檔案解析時發生錯誤，已略過。']
+  };
+
+  // ---------- indexes ----------
+  var actions = D.actions || [];
+  var byId = {};
+  actions.forEach(function (a) {
+    byId[a.id] = a;
+    var parts = [a.url, a.cls, a.type, a.form, a.formType, a.configFile];
+    (a.methods || []).forEach(function (m) {
+      parts.push(m.name, m.label);
+      (m.sps || []).forEach(function (s) { parts.push(s.name); s.via.forEach(function (v) { parts.push(v.cls + '.' + v.method); }); });
+      (m.tables || []).forEach(function (t) { parts.push(t); });
+    });
+    (a.forwards || []).forEach(function (f) { parts.push(f.name, f.path); (f.target && f.target.jsps || []).forEach(function (j) { parts.push(j); }); });
+    a._s = parts.filter(Boolean).join(' ').toLowerCase();
+    a._sp = {};
+    (a.methods || []).forEach(function (m) { (m.sps || []).forEach(function (s) { a._sp[s.name] = 1; }); });
+  });
+  var spNames = Object.keys(D.sps || {});
+  spNames.forEach(function (n) {
+    var s = D.sps[n];
+    var acts = {};
+    s.callers.forEach(function (c) { acts[c.action] = 1; });
+    s._acts = Object.keys(acts).length;
+    s._s = (n + ' ' + s.callers.map(function (c) { return (byId[c.action] ? byId[c.action].url : '') + ' ' + c.via.map(function (v) { return v.cls + '.' + v.method; }).join(' '); }).join(' ') + ' ' + s.jsps.join(' ')).toLowerCase();
+  });
+  spNames.sort(function (a, b) { return (a === '(dynamic)') - (b === '(dynamic)') || D.sps[b]._acts - D.sps[a]._acts || a.localeCompare(b); });
+  var jspPaths = Object.keys(D.jsps || {}).sort();
+  var includedBy = {};
+  jspPaths.forEach(function (p) {
+    var j = D.jsps[p];
+    (j.includes || []).forEach(function (i) { (includedBy[i] = includedBy[i] || []).push(p); });
+    j._s = (p + ' ' + (j.sps || []).join(' ') + ' ' + (j.tables || []).join(' ')).toLowerCase();
+  });
+  var tilesOf = {};
+  Object.keys(D.tiles || {}).forEach(function (n) {
+    (D.tiles[n].jsps || []).forEach(function (j) { (tilesOf[j] = tilesOf[j] || []).push(n); });
+  });
+  var warns = D.warnings || [];
+  warns.forEach(function (w) { w._s = JSON.stringify(w).toLowerCase(); });
+
+  // ---------- helpers ----------
+  var toastEl = document.getElementById('toast'), toastT;
+  function toast(msg) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(function () { toastEl.classList.remove('show'); }, 1400); }
+  function copy(text) {
+    var done = function () { toast('已複製：' + text); };
+    if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(text).then(done, fallback); } else fallback();
+    function fallback() {
+      var ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) { toast(text); }
+      document.body.removeChild(ta);
+    }
+  }
+  function loc(file, line) {
+    if (!file) return '';
+    var t = file + (line ? ':' + line : '');
+    return '<span class="loc" data-copy="' + esc(t) + '" title="點擊複製路徑">' + esc(file.split('/').pop()) + (line ? ':' + line : '') + '</span>';
+  }
+  function actLink(id, label) {
+    var a = byId[id];
+    return '<a class="pill act" href="#action/' + enc(id) + '">' + esc(label || (a ? a.url : id)) + '</a>';
+  }
+  function spLink(n) { return '<a class="pill sp" href="#sp/' + enc(n) + '">' + esc(spName(n)) + '</a>'; }
+  function jspLink(p) { return '<a class="pill jsp" href="#jsp/' + enc(p) + '">' + esc(p) + '</a>'; }
+  function targetHtml(t) {
+    if (!t) return '<span class="faint">—</span>';
+    if (t.kind === 'jsp') return jspLink(t.jsp) + (t.exists ? '' : ' <span class="b bad">檔案不存在</span>');
+    if (t.kind === 'tiles') return '<span class="pill static" title="Tiles 定義">' + esc(t.value) + '</span> <span class="arrow">→</span> ' + (t.jsps || []).map(jspLink).join(' ');
+    if (t.kind === 'action') return t.action ? actLink(t.action, t.value) : '<span class="pill static">' + esc(t.value) + '</span> <span class="b warn">找不到 Action</span>';
+    if (t.kind === 'none') return '<span class="faint">—</span>';
+    return '<span class="pill static">' + esc(t.value) + '</span>';
+  }
+  function viaHtml(via) {
+    return '<div class="via">' + via.map(function (v, i) {
+      var t = v.file + ':' + v.line;
+      return (i ? '<span class="arr">→</span>' : '') + '<span title="' + esc(t) + '" data-copy="' + esc(t) + '">' + esc(v.cls) + '.' + esc(v.method) + '</span>';
+    }).join('') + '</div>';
+  }
+  function kindBadge(a) {
+    var k = KIND[a.kind] || a.kind;
+    var cls = a.kind === 'missing' || a.kind === 'unknown' ? 'b bad' : (a.kind === 'custom' ? 'b warn' : 'b act');
+    return '<span class="' + cls + '">' + esc(k) + '</span>';
+  }
+  function sessionBadge(a) {
+    if (!a.form || a.scope !== 'session') return '';
+    return '<span class="b warn" title="' + (a.scopeDefault ? '未設定 scope，Struts 1 預設為 session' : 'scope=session') + '">session' + (a.scopeDefault ? '（預設）' : '') + '</span>';
+  }
+  function warnText(w) {
+    var t = WARN[w.type] ? WARN[w.type][0] : w.type;
+    var a = w.action && byId[w.action];
+    var parts = [];
+    if (w.forward) parts.push('forward「' + esc(w.forward) + '」');
+    if (w.method) parts.push('方法 ' + esc(w.method) + '()');
+    if (w.sp) parts.push('<span class="mono">' + esc(spName(w.sp)) + '</span>');
+    if (w.path && w.type !== 'dup-action') parts.push('<span class="mono">' + esc(w.path) + '</span>');
+    if (w.cls) parts.push('<span class="mono">' + esc(w.cls) + '</span>');
+    if (w.form) parts.push('form「' + esc(w.form) + '」');
+    if (w.type === 'dup-action') parts.push('<span class="mono">' + esc(w.path) + '</span>：' + esc(w.file) + '、' + esc(w.other));
+    if (w.file && w.type !== 'dup-action') parts.push(loc(w.file, w.line));
+    if (w.error) parts.push(esc(w.error));
+    return { title: t, detail: parts.join('　'), action: a };
+  }
+
+  // ---------- header ----------
+  var meta = D.meta || {};
+  document.getElementById('proj').textContent = meta.root || '';
+  document.getElementById('gen').textContent = (meta.generatedAt || '') + ' 產生';
+  var counts = { action: actions.length, sp: spNames.length, jsp: jspPaths.length, warn: warns.length };
+  Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) { b.querySelector('.cnt').textContent = counts[b.dataset.tab]; });
+
+  // ---------- sidebar ----------
+  var state = { tab: 'action', q: '', cur: '' };
+  var listEl = document.getElementById('list');
+  var qEl = document.getElementById('q');
+  var LIMIT = 400;
+
+  function match(s, terms) { for (var i = 0; i < terms.length; i++) if (s.indexOf(terms[i]) < 0) return false; return true; }
+
+  function renderList() {
+    var terms = state.q.toLowerCase().split(/\s+/).filter(Boolean);
+    var html = [], n = 0, total = 0;
+    var push = function (h) { total++; if (n < LIMIT) { html.push(h); n++; } };
+    if (state.tab === 'action') {
+      actions.forEach(function (a) {
+        if (terms.length && !match(a._s, terms)) return;
+        var key = 'action/' + a.id;
+        var ms = (a.methods || []).length, sps = Object.keys(a._sp).length;
+        push('<a class="row' + (state.cur === key ? ' on' : '') + '" href="#action/' + enc(a.id) + '"><div class="r1">' + esc(a.url) + '</div><div class="r2">' +
+          '<span>' + esc(short(a.cls) || KIND[a.kind] || '') + '</span>' +
+          (ms ? '<span>· ' + ms + ' 方法</span>' : '') + (sps ? '<span>· ' + sps + ' SP</span>' : '') +
+          (a.kind === 'missing' ? '<span class="b bad">無原始碼</span>' : '') + '</div></a>');
+      });
+    } else if (state.tab === 'sp') {
+      spNames.forEach(function (nm) {
+        var s = D.sps[nm];
+        if (terms.length && !match(s._s, terms)) return;
+        var key = 'sp/' + nm;
+        push('<a class="row' + (state.cur === key ? ' on' : '') + '" href="#sp/' + enc(nm) + '"><div class="r1">' + esc(spName(nm)) + '</div><div class="r2">' +
+          '<span>' + s._acts + ' 個 Action</span>' + (s.jsps.length ? '<span>· ' + s.jsps.length + ' 個 JSP 直接呼叫</span>' : '') +
+          (s.kind === 'dynamic' ? '<span class="b warn">動態</span>' : '') + (s.kind === 'func' ? '<span class="b">function</span>' : '') + '</div></a>');
+      });
+    } else if (state.tab === 'jsp') {
+      jspPaths.forEach(function (p) {
+        var j = D.jsps[p];
+        if (terms.length && !match(j._s, terms)) return;
+        var key = 'jsp/' + p;
+        var from = (j.forwardedFrom || []).length;
+        push('<a class="row' + (state.cur === key ? ' on' : '') + '" href="#jsp/' + enc(p) + '"><div class="r1">' + esc(p) + '</div><div class="r2">' +
+          (from ? '<span>被 ' + from + ' 處轉向</span>' : '') +
+          (j.scriptlets ? '<span class="b">scriptlet ' + j.scriptlets + '</span>' : '') +
+          (j.db ? '<span class="b bad">存取資料庫</span>' : '') +
+          (!j.exists ? '<span class="b bad">檔案不存在</span>' : '') + '</div></a>');
+      });
+    } else {
+      warns.forEach(function (w, i) {
+        if (terms.length && !match(w._s, terms)) return;
+        var t = warnText(w);
+        var href = t.action ? '#action/' + enc(t.action.id) : '#warn';
+        push('<a class="row" href="' + href + '"><div class="r1" style="font-family:var(--sans)">' + esc(t.title) + '</div><div class="r2">' +
+          (t.action ? '<span class="mono">' + esc(t.action.url) + '</span>' : '') + '<span>' + t.detail.replace(/<span class="loc"[^>]*>|<\/span>/g, '') + '</span></div></a>');
+      });
+    }
+    if (!total) html.push('<div class="more">沒有符合的項目</div>');
+    else if (total > n) html.push('<div class="more">還有 ' + (total - n) + ' 筆，請輸入更多關鍵字縮小範圍</div>');
+    listEl.innerHTML = html.join('');
+  }
+
+  function setTab(t) {
+    state.tab = t;
+    Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) { b.classList.toggle('on', b.dataset.tab === t); });
+    renderList();
+  }
+  document.getElementById('tabs').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    setTab(b.dataset.tab);
+    if (b.dataset.tab === 'warn') location.hash = '#warn';
+  });
+  var qT;
+  qEl.addEventListener('input', function () { clearTimeout(qT); qT = setTimeout(function () { state.q = qEl.value.trim(); renderList(); listEl.scrollTop = 0; }, 80); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === '/' && document.activeElement !== qEl) { e.preventDefault(); qEl.focus(); qEl.select(); }
+    else if (e.key === 'Escape' && document.activeElement === qEl) { qEl.value = ''; state.q = ''; renderList(); qEl.blur(); }
+  });
+  document.addEventListener('click', function (e) {
+    var c = e.target.closest('[data-copy]');
+    if (c) { e.preventDefault(); copy(c.getAttribute('data-copy')); }
+  });
+
+  // ---------- views ----------
+  function viewOverview() {
+    var c = meta.counts || {};
+    var h = [];
+    h.push('<div class="eyebrow">專案總覽</div><h1>' + esc((meta.root || '').split(/[\\/]/).pop() || '專案') + '</h1>');
+    h.push('<div class="sub"><span class="mono">' + esc(meta.root) + '</span><span>Action URL 規則 <span class="mono">' + esc(meta.actionPattern) + '</span></span><span>' + esc(meta.tool) + '</span></div>');
+    var stat = function (v, k, hint) { return '<div class="stat"><div class="v">' + v + '</div><div class="k">' + k + '</div>' + (hint ? '<div class="h">' + hint + '</div>' : '') + '</div>'; };
+    h.push('<div class="stats">' +
+      stat(c.actions, 'Action', c.actionClasses + ' 個類別') +
+      stat(c.methods, 'Action 方法') +
+      stat(c.sps, '資料庫程序（SP）') +
+      stat(c.jsps, 'JSP', c.jspScriptlet + ' 個含 scriptlet') +
+      stat(c.jspDb, 'JSP 直接存取資料庫') +
+      stat(c.sessionForms, 'session scope 的 Form', '共 ' + c.forms + ' 個 form-bean') +
+      stat(c.javaClasses, 'Java 類別') +
+      stat(c.warnings, '警告') + '</div>');
+
+    var top = spNames.slice(0, 15);
+    if (top.length) {
+      h.push('<h2>被最多 Action 使用的 SP <span class="n">前 ' + top.length + ' 名</span></h2><table class="t"><tr><th>SP</th><th>類型</th><th style="text-align:right">Action 數</th><th style="text-align:right">呼叫處</th></tr>');
+      top.forEach(function (n) {
+        var s = D.sps[n];
+        h.push('<tr class="click" data-href="#sp/' + enc(n) + '"><td class="mono">' + esc(spName(n)) + '</td><td>' + (s.kind === 'func' ? 'function' : s.kind === 'dynamic' ? '動態' : 'procedure') + '</td><td class="num">' + s._acts + '</td><td class="num">' + (s.callers.length + s.jsps.length) + '</td></tr>');
+      });
+      h.push('</table>');
+    }
+    var dbJsp = jspPaths.filter(function (p) { return D.jsps[p].db; });
+    if (dbJsp.length) {
+      h.push('<h2>直接存取資料庫的 JSP <span class="n">' + dbJsp.length + '</span></h2><div class="note">這些畫面在 scriptlet 裡直接執行 SQL 或呼叫 SP，翻新時邏輯不在 Action，容易被漏掉。</div><div class="pills" style="margin-top:10px">' + dbJsp.map(jspLink).join('') + '</div>');
+    }
+    if ((meta.jars || []).length) {
+      var s1 = meta.jars.some(function (j) { return /^struts(-core)?-1|^struts\.jar$/i.test(j); });
+      h.push('<h2>框架與函式庫 <span class="n">WEB-INF/lib 等處的 jar</span></h2><div class="pills">' + meta.jars.map(function (j) { return '<span class="pill static">' + esc(j) + '</span>'; }).join('') + '</div>');
+      if (s1) h.push('<div class="note">偵測到 Struts 1。Struts 1 已於 2013 年停止維護（end of life），不再提供安全性修補。</div>');
+    }
+    if ((meta.configFiles || []).length) {
+      h.push('<h2>Struts 設定檔</h2><table class="t"><tr><th>檔案</th><th>模組</th><th>web.xml</th><th style="text-align:right">Action</th></tr>');
+      meta.configFiles.forEach(function (f) {
+        h.push('<tr><td class="mono">' + esc(f.file) + '</td><td class="mono">' + esc(f.module || '（預設）') + '</td><td>' + (f.registered ? '已註冊' : '<span class="b bad">未註冊</span>') + '</td><td class="num">' + f.actions + '</td></tr>');
+      });
+      h.push('</table>');
+    }
+    if ((meta.filters || []).length) {
+      h.push('<h2>Filter <span class="n">web.xml，登入檢查、編碼等共用邏輯常在這裡</span></h2><table class="t"><tr><th>名稱</th><th>類別</th><th>套用範圍</th></tr>');
+      meta.filters.forEach(function (f) { h.push('<tr><td>' + esc(f.name) + '</td><td class="mono">' + esc(f.cls) + '</td><td class="mono">' + esc((f.patterns || []).join(', ')) + '</td></tr>'); });
+      h.push('</table>');
+    }
+    if ((meta.plugins || []).length || (meta.listeners || []).length) {
+      h.push('<h2>Plug-in 與 Listener</h2><div class="pills">' + (meta.plugins || []).concat(meta.listeners || []).map(function (p) { return '<span class="pill static">' + esc(p) + '</span>'; }).join('') + '</div>');
+    }
+    var wc = {};
+    warns.forEach(function (w) { wc[w.type] = (wc[w.type] || 0) + 1; });
+    var wk = Object.keys(wc);
+    if (wk.length) {
+      h.push('<h2>警告摘要</h2><table class="t"><tr><th>類型</th><th>說明</th><th style="text-align:right">數量</th></tr>');
+      wk.forEach(function (k) { h.push('<tr class="click" data-href="#warn"><td>' + esc(WARN[k] ? WARN[k][0] : k) + '</td><td class="muted">' + esc(WARN[k] ? WARN[k][1] : '') + '</td><td class="num">' + wc[k] + '</td></tr>'); });
+      h.push('</table>');
+    }
+    h.push('<div class="note" style="margin-top:28px">SP 與呼叫路徑是從原始碼靜態分析推得：以變數宣告型別、欄位、介面實作追蹤方法呼叫。反射、動態組字串、透過 Map 或設定檔決定的呼叫無法偵測，結果請當作盤點起點，關鍵流程仍需實際除錯確認。</div>');
+    return h.join('');
+  }
+
+  function viewAction(a) {
+    var h = [];
+    h.push('<div class="eyebrow">ACTION' + (a.module ? '　模組 ' + esc(a.module) : '') + '</div>');
+    h.push('<h1 class="mono">' + esc(a.url) + '</h1>');
+    h.push('<div class="sub">' + kindBadge(a) + sessionBadge(a) + (a.proxy ? '<span class="b">Spring 代理</span>' : '') + (!a.registered ? '<span class="b bad">設定檔未註冊</span>' : '') +
+      (a.cls ? '<span class="mono">' + esc(a.cls) + '</span>' + (a.clsFile ? loc(a.clsFile, a.clsLine) : '') : '') + '</div>');
+
+    var attr = function (k, v) { return '<div class="attr"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>'; };
+    var at = [];
+    at.push(attr('設定位置', loc(a.configFile, a.configLine) || '—'));
+    if (a.proxy) at.push(attr('struts-config 的 type', '<span class="mono">' + esc(a.type || '（由 RequestProcessor 代理）') + '</span>'));
+    if (a.base) at.push(attr('框架基底類別', '<span class="mono">' + esc(a.base) + '</span>'));
+    if (a.parameter) at.push(attr('parameter', '<span class="mono">' + esc(a.parameter) + '</span>' + (a.kind === 'dispatch' ? '<span class="faint">　依此參數值決定呼叫的方法</span>' : '')));
+    if (a.form) {
+      at.push(attr('Form', '<span class="mono">' + esc(a.form) + '</span>' + (a.formType ? '<div class="mono faint" style="font-size:12px">' + esc(a.formType) + '</div>' : '') + (a.formFile ? loc(a.formFile) : '')));
+      at.push(attr('Form scope', esc(a.scope) + (a.scopeDefault ? '<span class="faint">（未設定，預設 session）</span>' : '')));
+      at.push(attr('驗證', a.validate ? '開啟（validate=true）' : '關閉'));
+    }
+    if (a.input) at.push(attr('驗證失敗回到', targetHtml(a.inputTarget)));
+    if (a.forwardAttr) at.push(attr('直接轉向', targetHtml(a.forwardAttr)));
+    if (a.formProps) at.push(attr('DynaActionForm 欄位', '<div class="mono" style="font-size:12px">' + a.formProps.map(esc).join('<br>') + '</div>'));
+    h.push('<div class="card attrs" style="margin-top:18px">' + at.join('') + '</div>');
+
+    var ms = a.methods || [];
+    if (ms.length || a.sources.length || a.forwards.length) {
+      h.push('<h2>流程 <span class="n">滑鼠移到方法上可看它的路徑</span></h2><div class="card flow" id="flow"></div>');
+    }
+    if (ms.length) {
+      h.push('<h2>方法 <span class="n">' + ms.length + '</span></h2><div class="mcards">');
+      ms.forEach(function (m) {
+        h.push('<article class="mcard" id="m-' + esc(m.name) + '"><div class="mhead"><span class="mn">' + esc(m.name) + '()</span>' + loc(m.file, m.line) +
+          (m.inherited ? '<span class="b">繼承自 ' + esc(m.inherited) + '</span>' : '') +
+          (m.label ? '<span class="b act" title="LookupDispatchAction 依按鈕文字分派">按鈕：' + esc(m.label) + '</span>' : '') +
+          '<span class="hint">' + esc(m.urlHint) + '</span></div>');
+        var fw = (m.forwards || []).map(function (f) {
+          return '<div style="margin-bottom:4px"><span class="pill static">' + esc(f.name) + '</span>' + (f.scope === 'global' ? ' <span class="b">global</span>' : '') +
+            (f.scope === 'undefined' ? ' <span class="b bad">未定義</span>' : ' <span class="arrow">→</span> ' + targetHtml(f.target)) + '</div>';
+        }).concat((m.paths || []).map(function (p) { return '<div><span class="b">new ActionForward</span> ' + targetHtml(p.target) + '</div>'; }));
+        h.push('<div class="mrow"><div class="k">轉向</div><div>' + (fw.length ? fw.join('') : '<span class="faint">程式中沒有偵測到 findForward（可能在共用方法中處理）</span>') + '</div></div>');
+        var sps = m.sps || [];
+        h.push('<div class="mrow"><div class="k">資料庫程序</div><div>' + (sps.length ? sps.map(function (s) {
+          return '<div class="spitem"><div>' + spLink(s.name) + (s.kind === 'func' ? ' <span class="b">function</span>' : '') + (s.kind === 'dynamic' ? ' <span class="b warn">動態組成，需人工確認</span>' : '') + '</div>' + viaHtml(s.via) + '</div>';
+        }).join('') : '<span class="faint">沒有偵測到</span>') + (m.truncated ? '<div class="b warn" style="margin-top:6px">呼叫鏈過大，已截斷</div>' : '') + '</div></div>');
+        if ((m.tables || []).length) h.push('<div class="mrow"><div class="k">SQL 資料表</div><div class="pills">' + m.tables.map(function (t) { return '<span class="pill static">' + esc(t) + '</span>'; }).join('') + '</div></div>');
+        var ss = m.session || {};
+        if ((ss.set || []).length || (ss.get || []).length) {
+          h.push('<div class="mrow"><div class="k">Session</div><div>' +
+            ((ss.set || []).length ? '<div><span class="faint">寫入　</span><span class="mono">' + ss.set.map(esc).join('、') + '</span></div>' : '') +
+            ((ss.get || []).length ? '<div><span class="faint">讀取　</span><span class="mono">' + ss.get.map(esc).join('、') + '</span></div>' : '') + '</div></div>');
+        }
+        if ((m.requestSet || []).length) h.push('<div class="mrow"><div class="k">Request 屬性</div><div class="mono">' + m.requestSet.map(esc).join('、') + '</div></div>');
+        h.push('</article>');
+      });
+      h.push('</div>');
+    }
+    if (a.forwards.length) {
+      h.push('<h2>forward 定義 <span class="n">' + a.forwards.length + '</span></h2><table class="t"><tr><th>名稱</th><th>目標</th><th>使用的方法</th></tr>');
+      a.forwards.forEach(function (f) {
+        h.push('<tr><td class="mono">' + esc(f.name) + (f.redirect ? ' <span class="b">redirect</span>' : '') + '</td><td>' + targetHtml(f.target) + '</td><td class="mono">' +
+          (f.usedBy.length ? f.usedBy.map(function (n) { return esc(n) + '()'; }).join('、') : '<span class="faint" style="font-family:var(--sans)">' + (ms.length ? '未偵測到' : '—') + '</span>') + '</td></tr>');
+      });
+      h.push('</table>');
+    }
+    var gf = (D.globalForwards || {})[a.module] || [];
+    if (gf.length) {
+      h.push('<h2>global-forwards <span class="n">所有 Action 共用</span></h2><table class="t"><tr><th>名稱</th><th>目標</th></tr>');
+      gf.forEach(function (f) { h.push('<tr><td class="mono">' + esc(f.name) + '</td><td>' + targetHtml(f.target) + '</td></tr>'); });
+      h.push('</table>');
+    }
+    if ((a.validation || []).length) {
+      h.push('<h2>驗證規則 <span class="n">validation.xml</span></h2><table class="t"><tr><th>欄位</th><th>規則</th></tr>');
+      a.validation.forEach(function (v) { h.push('<tr><td class="mono">' + esc(v.field) + '</td><td class="mono">' + esc(v.depends) + '</td></tr>'); });
+      h.push('</table>');
+    }
+    if ((a.exceptions || []).length) {
+      h.push('<h2>例外處理</h2><table class="t"><tr><th>例外類別</th><th>導向</th></tr>');
+      a.exceptions.forEach(function (x) { h.push('<tr><td class="mono">' + esc(x.type) + '</td><td class="mono">' + esc(x.path) + '</td></tr>'); });
+      h.push('</table>');
+    }
+    if (a.sources.length) {
+      h.push('<h2>從哪些畫面進來 <span class="n">JSP 中出現此 URL</span></h2><div class="pills">' + a.sources.map(jspLink).join('') + '</div>');
+    }
+    return h.join('');
+  }
+
+  // flow diagram
+  function buildFlow(a) {
+    var el = document.getElementById('flow');
+    if (!el) return;
+    var ms = a.methods || [];
+    var edges = [];
+    var spCol = {}, spOrder = [], tgCol = {}, tgOrder = [];
+    var tgKey = function (t) { return t.kind + ':' + (t.jsp || t.action || t.value); };
+    var addTg = function (t, label, m) {
+      if (!t || t.kind === 'none') return null;
+      var k = tgKey(t);
+      if (!tgCol[k]) { tgCol[k] = { t: t, labels: [], ms: [] }; tgOrder.push(k); }
+      if (label && tgCol[k].labels.indexOf(label) < 0) tgCol[k].labels.push(label);
+      if (m && tgCol[k].ms.indexOf(m) < 0) tgCol[k].ms.push(m);
+      return k;
+    };
+    ms.forEach(function (m) {
+      (m.sps || []).forEach(function (s) {
+        if (!spCol[s.name]) { spCol[s.name] = { s: s, ms: [] }; spOrder.push(s.name); }
+        spCol[s.name].ms.push(m.name);
+        edges.push({ f: 'm:' + m.name, t: 'sp:' + s.name, m: m.name });
+      });
+      (m.forwards || []).forEach(function (f) { var k = addTg(f.target, f.name, m.name); if (k) edges.push({ f: 'm:' + m.name, t: 'tg:' + k, m: m.name }); });
+      (m.paths || []).forEach(function (p) { var k = addTg(p.target, '', m.name); if (k) edges.push({ f: 'm:' + m.name, t: 'tg:' + k, m: m.name }); });
+    });
+    a.forwards.forEach(function (f) { addTg(f.target, f.name, null); });
+    if (a.forwardAttr) { var fk = addTg(a.forwardAttr, '直接轉向', null); if (fk) edges.push({ f: 'act', t: 'tg:' + fk }); }
+    a.sources.forEach(function (s) { edges.push({ f: 'src:' + s, t: 'act' }); });
+
+    var CAP = 30;
+    var col = function (title, items) {
+      var more = items.length > CAP ? '<div class="node none">另有 ' + (items.length - CAP) + ' 項</div>' : '';
+      return '<div class="col"><div class="colh">' + title + '</div>' + (items.length ? items.slice(0, CAP).join('') : '<div class="node none">無</div>') + more + '</div>';
+    };
+    var srcN = a.sources.map(function (s) { return '<a class="node jsp" data-k="src:' + esc(s) + '" href="#jsp/' + enc(s) + '">' + esc(s) + '</a>'; });
+    var mN = ['<div class="node act-h" data-k="act">' + esc(short(a.cls) || a.url) + '</div>'].concat(ms.map(function (m) {
+      return '<a class="node m" data-k="m:' + esc(m.name) + '" data-m="' + esc(m.name) + '" href="#action/' + enc(a.id) + '" data-scroll="m-' + esc(m.name) + '">' + esc(m.name) + '()' +
+        (m.label ? '<span class="s">' + esc(m.label) + '</span>' : (m.inherited ? '<span class="s">繼承自 ' + esc(m.inherited) + '</span>' : '')) + '</a>';
+    }));
+    var spN = spOrder.map(function (n) {
+      return '<a class="node sp" data-k="sp:' + esc(n) + '" data-ms="' + esc(spCol[n].ms.join(' ')) + '" href="#sp/' + enc(n) + '">' + esc(spName(n)) + (spCol[n].s.kind === 'dynamic' ? '<span class="s">動態組成</span>' : '') + '</a>';
+    });
+    var tgN = tgOrder.map(function (k) {
+      var x = tgCol[k], t = x.t, cls, href, label, sub = x.labels.join('、');
+      if (t.kind === 'jsp') { cls = 'jsp'; href = '#jsp/' + enc(t.jsp); label = t.jsp; }
+      else if (t.kind === 'tiles') { cls = 'jsp'; href = (t.jsps && t.jsps.length) ? '#jsp/' + enc(t.jsps[t.jsps.length - 1]) : '#'; label = t.value; sub = (sub ? sub + '　' : '') + 'Tiles'; }
+      else if (t.kind === 'action') { cls = 'tg-action'; href = t.action ? '#action/' + enc(t.action) : '#'; label = t.value; }
+      else { cls = 'tg-other'; href = '#'; label = t.value; }
+      var unused = ms.length && !x.ms.length && x.labels.indexOf('直接轉向') < 0;
+      return '<a class="node ' + cls + (unused ? ' unused' : '') + '" data-k="tg:' + esc(k) + '" data-ms="' + esc(x.ms.join(' ')) + '" href="' + href + '"' + (unused ? ' title="程式中沒有偵測到使用這個 forward"' : '') + '>' + esc(label) + (sub ? '<span class="s">' + esc(sub) + '</span>' : '') + '</a>';
+    });
+    el.innerHTML = col('從哪些畫面進來', srcN) + col('Action 方法', mN) + col('資料庫程序', spN) + col('轉向', tgN) + '<svg aria-hidden="true"></svg>';
+    el._edges = edges;
+    drawEdges(el);
+
+    el.addEventListener('mouseover', function (e) {
+      var n = e.target.closest('.node[data-m]');
+      if (!n) return;
+      var m = n.getAttribute('data-m');
+      Array.prototype.forEach.call(el.querySelectorAll('path'), function (p) { var on = p.getAttribute('data-m') === m; p.classList.toggle('on', on); p.classList.toggle('off', !on); });
+      Array.prototype.forEach.call(el.querySelectorAll('.node'), function (x) {
+        if (x.classList.contains('act-h') || x.classList.contains('none')) return;
+        var ok = x.getAttribute('data-m') === m || (' ' + (x.getAttribute('data-ms') || '') + ' ').indexOf(' ' + m + ' ') >= 0;
+        x.classList.toggle('off', !ok); x.classList.toggle('on', x.getAttribute('data-m') === m);
+      });
+    });
+    el.addEventListener('mouseleave', clearHl);
+    el.addEventListener('mouseout', function (e) { if (e.target.closest('.node[data-m]') && !(e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('.node[data-m]'))) clearHl(); });
+    function clearHl() { Array.prototype.forEach.call(el.querySelectorAll('.on,.off'), function (x) { x.classList.remove('on', 'off'); }); }
+    el.addEventListener('click', function (e) {
+      var n = e.target.closest('[data-scroll]');
+      if (!n) return;
+      e.preventDefault();
+      var c = document.getElementById(n.getAttribute('data-scroll'));
+      if (c) { c.scrollIntoView({ behavior: 'smooth', block: 'start' }); c.classList.remove('flash'); void c.offsetWidth; c.classList.add('flash'); }
+    });
+  }
+  function drawEdges(el) {
+    var svg = el.querySelector('svg');
+    if (!svg || !el._edges) return;
+    var box = el.getBoundingClientRect();
+    var pos = {};
+    Array.prototype.forEach.call(el.querySelectorAll('.node[data-k]'), function (n) {
+      var r = n.getBoundingClientRect();
+      pos[n.getAttribute('data-k')] = { l: r.left - box.left, r: r.right - box.left, y: r.top - box.top + Math.min(r.height / 2, 16) };
+    });
+    var out = [];
+    el._edges.forEach(function (e) {
+      var a = pos[e.f], b = pos[e.t];
+      if (!a || !b) return;
+      var x1 = a.r, x2 = b.l;
+      if (x2 < x1) return;
+      var dx = Math.max(16, (x2 - x1) / 2);
+      out.push('<path data-m="' + esc(e.m || '') + '" d="M' + x1 + ' ' + a.y + ' C' + (x1 + dx) + ' ' + a.y + ' ' + (x2 - dx) + ' ' + b.y + ' ' + x2 + ' ' + b.y + '"/>');
+    });
+    svg.innerHTML = out.join('');
+  }
+  window.addEventListener('resize', function () { var f = document.getElementById('flow'); if (f) drawEdges(f); });
+
+  function viewSp(name) {
+    var s = D.sps[name];
+    var h = [];
+    h.push('<div class="eyebrow">資料庫程序</div><h1 class="mono">' + esc(spName(name)) + '</h1>');
+    var parts = name.split('.');
+    h.push('<div class="sub">' + (s.kind === 'func' ? '<span class="b">function（在 SQL 中呼叫）</span>' : s.kind === 'dynamic' ? '<span class="b warn">名稱為動態組成</span>' : '<span class="b sp">procedure 呼叫</span>') +
+      (parts.length >= 2 ? '<span>package <span class="mono">' + esc(parts.slice(0, -1).join('.')) + '</span></span>' : '') +
+      '<span>' + s._acts + ' 個 Action、' + s.callers.length + ' 個方法' + (s.jsps.length ? '、' + s.jsps.length + ' 個 JSP' : '') + '</span></div>');
+    if (parts.length >= 2 && s.kind !== 'dynamic') {
+      var pkg = parts.slice(0, -1).join('.');
+      var siblings = spNames.filter(function (n) { return n !== name && n.indexOf(pkg + '.') === 0; });
+      if (siblings.length) h.push('<h2>同一個 package 的其他程序 <span class="n">' + siblings.length + '</span></h2><div class="pills">' + siblings.map(spLink).join('') + '</div>');
+    }
+    if (s.callers.length) {
+      h.push('<h2>呼叫來源 <span class="n">' + s.callers.length + '</span></h2><table class="t"><tr><th>Action</th><th>方法</th><th>呼叫路徑</th></tr>');
+      s.callers.forEach(function (c) {
+        var a = byId[c.action];
+        h.push('<tr><td>' + actLink(c.action) + '</td><td class="mono">' + esc(c.method) + '()</td><td>' + viaHtml(c.via) + '</td></tr>');
+      });
+      h.push('</table>');
+    }
+    if (s.jsps.length) h.push('<h2>JSP 直接呼叫 <span class="n">scriptlet</span></h2><div class="pills">' + s.jsps.map(jspLink).join('') + '</div>');
+    return h.join('');
+  }
+
+  function viewJsp(p) {
+    var j = D.jsps[p];
+    var h = [];
+    h.push('<div class="eyebrow">JSP</div><h1 class="mono">' + esc(p) + '</h1>');
+    h.push('<div class="sub">' + (j.exists ? loc(j.file) : '<span class="b bad">檔案不存在（被設定引用但找不到）</span>') +
+      (j.scriptlets ? '<span class="b">scriptlet ' + j.scriptlets + ' 段</span>' : '') + (j.expressions ? '<span class="b">運算式 ' + j.expressions + ' 處</span>' : '') +
+      (j.db ? '<span class="b bad">scriptlet 直接存取資料庫</span>' : '') + '</div>');
+    var from = j.forwardedFrom || [];
+    if (from.length) {
+      h.push('<h2>由哪些 Action 轉向過來 <span class="n">' + from.length + '</span></h2><table class="t"><tr><th>Action</th><th>forward</th><th>經由</th></tr>');
+      from.forEach(function (f) { h.push('<tr><td>' + actLink(f.action) + '</td><td class="mono">' + esc(f.forward) + '</td><td class="mono">' + (f.tiles ? 'Tiles ' + esc(f.tiles) : '—') + '</td></tr>'); });
+      h.push('</table>');
+    }
+    if ((j.submits || []).length) h.push('<h2>畫面上呼叫的 Action <span class="n">表單、連結、JavaScript</span></h2><div class="pills">' + j.submits.map(function (id) { return actLink(id); }).join('') + '</div>');
+    if ((j.submitsUnresolved || []).length) h.push('<div class="note">另有找不到對應 Action 的 URL：<span class="mono">' + j.submitsUnresolved.map(esc).join('、') + '</span></div>');
+    if ((j.sps || []).length) h.push('<h2>scriptlet 直接呼叫的 SP</h2><div class="pills">' + j.sps.map(spLink).join('') + '</div>');
+    if ((j.tables || []).length) h.push('<h2>scriptlet 中的 SQL 資料表</h2><div class="pills">' + j.tables.map(function (t) { return '<span class="pill static">' + esc(t) + '</span>'; }).join('') + '</div>');
+    if ((j.includes || []).length) h.push('<h2>引入的檔案</h2><div class="pills">' + j.includes.map(jspLink).join('') + '</div>');
+    if ((includedBy[p] || []).length) h.push('<h2>被哪些 JSP 引入 <span class="n">' + includedBy[p].length + '</span></h2><div class="pills">' + includedBy[p].map(jspLink).join('') + '</div>');
+    if ((tilesOf[p] || []).length) h.push('<h2>屬於哪些 Tiles 定義</h2><div class="pills">' + tilesOf[p].map(function (t) { return '<span class="pill static">' + esc(t) + '</span>'; }).join('') + '</div>');
+    return h.join('');
+  }
+
+  function viewWarnings() {
+    var h = ['<div class="eyebrow">警告</div><h1>需要確認的地方</h1><div class="sub">' + warns.length + ' 筆</div>'];
+    var groups = {};
+    warns.forEach(function (w) { (groups[w.type] = groups[w.type] || []).push(w); });
+    Object.keys(groups).forEach(function (k) {
+      var info = WARN[k] || [k, ''];
+      h.push('<h2>' + esc(info[0]) + ' <span class="n">' + groups[k].length + '</span></h2>' + (info[1] ? '<div class="muted" style="margin:-4px 0 10px;font-size:12.5px">' + esc(info[1]) + '</div>' : '') + '<table class="t">');
+      groups[k].forEach(function (w) { var t = warnText(w); h.push('<tr><td style="width:34%">' + (t.action ? actLink(t.action.id) : '') + '</td><td>' + t.detail + '</td></tr>'); });
+      h.push('</table>');
+    });
+    if (!warns.length) h.push('<div class="empty">沒有警告</div>');
+    return h.join('');
+  }
+
+  // ---------- routing ----------
+  function route() {
+    var h = location.hash.slice(1);
+    var i = h.indexOf('/');
+    var kind = i < 0 ? h : h.slice(0, i);
+    var key = i < 0 ? '' : decodeURIComponent(h.slice(i + 1));
+    var html, cur = '';
+    if (kind === 'action' && byId[key]) { html = '<div class="page">' + viewAction(byId[key]) + '</div>'; cur = 'action/' + key; if (state.tab !== 'action' && !state.q) setTab('action'); }
+    else if (kind === 'sp' && D.sps[key]) { html = '<div class="page">' + viewSp(key) + '</div>'; cur = 'sp/' + key; if (state.tab !== 'sp' && !state.q) setTab('sp'); }
+    else if (kind === 'jsp' && D.jsps[key]) { html = '<div class="page">' + viewJsp(key) + '</div>'; cur = 'jsp/' + key; if (state.tab !== 'jsp' && !state.q) setTab('jsp'); }
+    else if (kind === 'warn') { html = '<div class="page">' + viewWarnings() + '</div>'; if (state.tab !== 'warn') setTab('warn'); }
+    else html = '<div class="page">' + viewOverview() + '</div>';
+    main.innerHTML = html;
+    main.scrollTop = 0;
+    state.cur = cur;
+    Array.prototype.forEach.call(listEl.querySelectorAll('.row'), function (r) { r.classList.toggle('on', r.getAttribute('href') === '#' + cur.replace(/^(\w+)\/(.*)$/, function (_, k, v) { return k + '/' + enc(v); })); });
+    if (kind === 'action' && byId[key]) buildFlow(byId[key]);
+    Array.prototype.forEach.call(main.querySelectorAll('tr[data-href]'), function (tr) { tr.addEventListener('click', function () { location.hash = tr.getAttribute('data-href'); }); });
+  }
+  window.addEventListener('hashchange', route);
+  setTab('action');
+  route();
+})();
+</script>
+</body>
+</html>
