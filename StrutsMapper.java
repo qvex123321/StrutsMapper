@@ -58,7 +58,7 @@ public class StrutsMapper {
 
     static class Forward {
         String name, path;
-        boolean redirect;
+        boolean redirect, contextRelative;
     }
 
     static class FormBean {
@@ -125,6 +125,9 @@ public class StrutsMapper {
     final List<Path> jspFiles = new ArrayList<Path>();
     final List<Path> propFiles = new ArrayList<Path>();
     final List<String> jarNames = new ArrayList<String>();
+    final List<Path> jarPaths = new ArrayList<Path>();
+    final Map<String, String> jarOfClass = new HashMap<String, String>();
+    final Map<String, String> jspSuffix = new HashMap<String, String>();
     final List<Path> webRoots = new ArrayList<Path>();
 
     final Map<String, String> configModule = new LinkedHashMap<String, String>();
@@ -280,7 +283,10 @@ public class StrutsMapper {
                 else if (n.endsWith(".java")) javaFiles.add(f);
                 else if (n.endsWith(".jsp") || n.endsWith(".jspf")) jspFiles.add(f);
                 else if (n.endsWith(".properties")) propFiles.add(f);
-                else if (n.endsWith(".jar")) jarNames.add(f.getFileName().toString());
+                else if (n.endsWith(".jar")) {
+                    jarNames.add(f.getFileName().toString());
+                    jarPaths.add(f);
+                }
                 return FileVisitResult.CONTINUE;
             }
 
@@ -413,11 +419,12 @@ public class StrutsMapper {
             docs.add(new Object[] {p, text, r, kind});
         }
         for (Object[] o : docs) if ("web-app".equals(o[3])) parseWebXml((Path) o[0], (Element) o[2]);
+        // Spring first: some frameworks register struts-config files per module from Spring beans
+        for (Object[] o : docs) if ("beans".equals(o[3])) parseSpring((Element) o[2]);
         for (Object[] o : docs) {
             String k = (String) o[3];
             if ("struts-config".equals(k)) parseStrutsConfig((Path) o[0], (String) o[1], (Element) o[2]);
             else if ("tiles-definitions".equals(k)) parseTiles((Element) o[2]);
-            else if ("beans".equals(k)) parseSpring((Element) o[2]);
             else if ("form-validation".equals(k)) parseValidation((Element) o[2]);
         }
     }
@@ -483,6 +490,19 @@ public class StrutsMapper {
                 registered[0] = true;
                 return e.getValue();
             }
+        }
+        String fn = p.getFileName().toString();
+        String found = null;
+        int n = 0;
+        for (Map.Entry<String, String> e : configModule.entrySet()) {
+            if (e.getKey().equals(fn) || e.getKey().endsWith("/" + fn)) {
+                found = e.getValue();
+                n++;
+            }
+        }
+        if (n == 1) {
+            registered[0] = true;
+            return found;
         }
         registered[0] = configModule.isEmpty();
         return "";
@@ -569,6 +589,7 @@ public class StrutsMapper {
         f.name = attr(fe, "name");
         f.path = attr(fe, "path");
         f.redirect = "true".equalsIgnoreCase(attr(fe, "redirect"));
+        f.contextRelative = "true".equalsIgnoreCase(attr(fe, "contextRelative"));
         return f;
     }
 
@@ -593,6 +614,7 @@ public class StrutsMapper {
     void parseSpring(Element r) {
         Map<String, String> parents = new HashMap<String, String>();
         for (Element b : all(r, "bean")) {
+            registerConfigFromBean(b);
             String cls = attr(b, "class");
             String parent = attr(b, "parent");
             List<String> names = new ArrayList<String>();
@@ -612,6 +634,40 @@ public class StrutsMapper {
         for (Element a : all(r, "alias")) {
             String n = attr(a, "name"), al = attr(a, "alias");
             if (n != null && al != null && springBeans.containsKey(n)) springBeans.put(al, springBeans.get(n));
+        }
+    }
+
+    /**
+     * Frameworks such as eBao register struts-config files from Spring, e.g.
+     *   <bean class="...StrutsConfigExport">
+     *     <property name="moduleName" value="/act"/>
+     *     <property name="configFile"><list><value>/WEB-INF/.../struts-config-x.xml</value></list></property>
+     */
+    void registerConfigFromBean(Element b) {
+        String module = null;
+        List<String> files = new ArrayList<String>();
+        for (Element pr : kids(b, "property")) {
+            String name = attr(pr, "name");
+            if (name == null) continue;
+            List<String> vals = new ArrayList<String>();
+            String v = attr(pr, "value");
+            if (v != null) vals.add(v);
+            for (Element ve : all(pr, "value")) vals.add(ve.getTextContent().trim());
+            if (name.equals("moduleName") || name.equals("module") || name.equals("prefix")) {
+                if (!vals.isEmpty()) module = vals.get(0);
+            } else if (name.toLowerCase(Locale.ROOT).startsWith("configfile") || name.equals("configLocations")) {
+                for (String x : vals) for (String y : x.split(",")) if (!y.trim().isEmpty()) files.add(y.trim());
+            }
+        }
+        if (module == null || files.isEmpty()) return;
+        module = module.trim();
+        if (module.equals("/")) module = "";
+        if (!module.isEmpty() && !module.startsWith("/")) module = "/" + module;
+        while (module.endsWith("/")) module = module.substring(0, module.length() - 1);
+        for (String f : files) {
+            String key = f.replace('\\', '/');
+            while (key.startsWith("/")) key = key.substring(1);
+            configModule.put(key, module);
         }
     }
 
@@ -1507,7 +1563,33 @@ public class StrutsMapper {
     static final Pattern P_INC_ACT = Pattern.compile("<jsp:include\\s+page\\s*=\\s*[\"']([^\"'<]+)[\"']");
     static final Pattern P_INC_TILES = Pattern.compile("<tiles:insert\\b[^>]*?\\b(?:page|template)\\s*=\\s*[\"']([^\"'<]+)[\"']");
 
+    /** Index every "/a/b/c.jsp" suffix so config paths match source-tree paths with extra prefixes. */
+    void indexJsps() {
+        for (Path p : jspFiles) jspEntry(webPath(p)).put("exists", true);
+        for (String key : jspInfo.keySet()) {
+            int i = 0;
+            while ((i = key.indexOf('/', i)) >= 0) {
+                String suf = key.substring(i);
+                String old = jspSuffix.get(suf);
+                jspSuffix.put(suf, old == null || old.equals(key) ? key : "\u0000");
+                i++;
+            }
+        }
+    }
+
+    boolean jspExists(String k) {
+        Map<String, Object> e = jspInfo.get(k);
+        return e != null && Boolean.TRUE.equals(e.get("exists"));
+    }
+
+    String resolveJsp(String p) {
+        if (p == null || jspExists(p)) return p;
+        String k = jspSuffix.get(p.startsWith("/") ? p : "/" + p);
+        return k != null && !k.equals("\u0000") ? k : p;
+    }
+
     void parseJsps() {
+        indexJsps();
         for (Path p : jspFiles) {
             String t = read(p);
             String wp = webPath(p);
@@ -1572,7 +1654,7 @@ public class StrutsMapper {
                 while (im.find()) {
                     String v = im.group(1).trim();
                     if (v.contains("<%") || v.contains("${")) continue;
-                    inc.add(resolveRelative(wp, v));
+                    inc.add(resolveJsp(resolveRelative(wp, v)));
                 }
             }
             j.put("includes", new ArrayList<String>(inc));
@@ -1690,15 +1772,17 @@ public class StrutsMapper {
         if (t == null || depth > 10) return r;
         if (!ownOnly) {
             if (t.ext != null) for (String s : tilesJsps(t.ext, false, depth + 1)) if (!r.contains(s)) r.add(s);
-            if (t.path != null && !r.contains(t.path)) r.add(0, t.path);
+            String tp = resolveJsp(t.path);
+            if (tp != null && !r.contains(tp)) r.add(0, tp);
         }
         for (String[] put : t.puts) {
             String v = put[1];
             if (v == null || v.isEmpty()) continue;
             if (tiles.containsKey(v)) {
                 for (String s : tilesJsps(v, false, depth + 1)) if (!r.contains(s)) r.add(s);
-            } else if (v.startsWith("/") && !r.contains(v)) {
-                r.add(v);
+            } else if (v.startsWith("/")) {
+                String rv = resolveJsp(v);
+                if (!r.contains(rv)) r.add(rv);
             }
         }
         return r;
@@ -1729,8 +1813,12 @@ public class StrutsMapper {
         }
         String lower = p.toLowerCase(Locale.ROOT);
         if (lower.endsWith(".jsp") || lower.endsWith(".jspf") || lower.endsWith(".html") || lower.endsWith(".htm")) {
-            String jp = p;
-            if (!module.isEmpty() && jspInfo.containsKey(module + p) && Boolean.TRUE.equals(jspInfo.get(module + p).get("exists"))) jp = module + p;
+            String jp = null;
+            if (!module.isEmpty()) {
+                String mr = resolveJsp(module + p);
+                if (jspExists(mr)) jp = mr;
+            }
+            if (jp == null) jp = resolveJsp(p);
             t.put("kind", "jsp");
             t.put("jsp", jp);
             Map<String, Object> e = jspInfo.get(jp);
@@ -1765,7 +1853,17 @@ public class StrutsMapper {
         Set<String> actionClasses = new HashSet<String>();
         int methodCount = 0;
 
+        // classes referenced by actions but missing from the sources: look them up in jars once
+        Set<String> missing = new HashSet<String>();
         for (ActionDef a : actions) {
+            String c = actionClass(a);
+            if (c != null && !classes.containsKey(c)) missing.add(c);
+        }
+        scanJars(missing);
+
+        int done = 0;
+        for (ActionDef a : actions) {
+            if (++done % 200 == 0) log("Tracing actions " + done + " / " + actions.size());
             Map<String, Object> o = new LinkedHashMap<String, Object>();
             o.put("id", a.id);
             o.put("module", a.module);
@@ -1777,14 +1875,9 @@ public class StrutsMapper {
             o.put("registered", a.registered);
             o.put("type", a.type);
 
-            String clsName = a.type;
-            boolean proxy = (a.type != null && a.type.endsWith("DelegatingActionProxy")) || delegatingModules.contains(a.module);
-            if (proxy) {
-                String bc = springBeans.get(a.fullPath);
-                if (bc == null) bc = springBeans.get(a.path);
-                if (bc == null) warn("bean-missing", "action", a.id);
-                else clsName = bc;
-            }
+            boolean proxy = isProxy(a);
+            String clsName = actionClass(a);
+            if (proxy && beanClass(a) == null) warn("bean-missing", "action", a.id);
             o.put("proxy", proxy);
             JClass jc = clsName == null ? null : classes.get(clsName);
             o.put("cls", clsName);
@@ -1802,6 +1895,13 @@ public class StrutsMapper {
             else if (clsName.startsWith("org.apache.struts.actions.")) {
                 kind = "builtin";
                 base = clsName.substring(clsName.lastIndexOf('.') + 1);
+            } else if (clsName.endsWith("PageForwardAction") || clsName.endsWith(".ForwardAction")) {
+                kind = "forward";
+                base = clsName.substring(clsName.lastIndexOf('.') + 1);
+                if (jarOfClass.containsKey(clsName)) o.put("jar", jarOfClass.get(clsName));
+            } else if (jc == null && jarOfClass.containsKey(clsName)) {
+                kind = "jar";
+                o.put("jar", jarOfClass.get(clsName));
             } else if (jc == null) {
                 kind = "missing";
                 if (!clsName.startsWith("org.springframework")) warn("class-missing", "action", a.id, "cls", clsName);
@@ -1920,7 +2020,7 @@ public class StrutsMapper {
                             sc = "undefined";
                             warn("fwd-undefined", "action", a.id, "method", jm.name, "forward", fn);
                         } else {
-                            f.put("target", target(a.module, def.path));
+                            f.put("target", target(def.contextRelative ? "" : a.module, def.path));
                         }
                         f.put("scope", sc);
                         fw.add(f);
@@ -1990,7 +2090,7 @@ public class StrutsMapper {
                 fo.put("name", f.name);
                 fo.put("path", f.path);
                 fo.put("redirect", f.redirect);
-                Map<String, Object> tg = target(a.module, f.path);
+                Map<String, Object> tg = target(f.contextRelative ? "" : a.module, f.path);
                 fo.put("target", tg);
                 List<String> ub = usedBy.get(f.name);
                 fo.put("usedBy", ub == null ? new ArrayList<String>() : ub);
@@ -2076,7 +2176,7 @@ public class StrutsMapper {
                 Map<String, Object> fo = new LinkedHashMap<String, Object>();
                 fo.put("name", f.name);
                 fo.put("path", f.path);
-                fo.put("target", target(e.getKey(), f.path));
+                fo.put("target", target(f.contextRelative ? "" : e.getKey(), f.path));
                 l.add(fo);
             }
             gfOut.put(e.getKey(), l);
@@ -2130,6 +2230,62 @@ public class StrutsMapper {
         data.put("globalForwards", gfOut);
         data.put("warnings", warnings);
         return data;
+    }
+
+    boolean isProxy(ActionDef a) {
+        return (a.type != null && a.type.endsWith("DelegatingActionProxy")) || delegatingModules.contains(a.module);
+    }
+
+    final Map<String, String> beanCache = new HashMap<String, String>();
+
+    /** Spring bean class for a DelegatingActionProxy action (bean name = module prefix + path). */
+    String beanClass(ActionDef a) {
+        if (beanCache.containsKey(a.id)) return beanCache.get(a.id);
+        String bc = springBeans.get(a.fullPath);
+        if (bc == null) bc = springBeans.get(a.path);
+        if (bc == null) {
+            // module could not be determined: accept a unique bean whose name ends with "/<anything>" + path
+            String found = null;
+            int n = 0;
+            for (Map.Entry<String, String> e : springBeans.entrySet()) {
+                String k = e.getKey();
+                if (k.length() > a.path.length() && k.endsWith(a.path) && k.startsWith("/")) {
+                    found = e.getValue();
+                    n++;
+                }
+            }
+            if (n == 1) bc = found;
+        }
+        beanCache.put(a.id, bc);
+        return bc;
+    }
+
+    String actionClass(ActionDef a) {
+        if (isProxy(a)) {
+            String bc = beanClass(a);
+            if (bc != null) return bc;
+        }
+        return a.type;
+    }
+
+    void scanJars(Set<String> wanted) {
+        if (wanted.isEmpty() || jarPaths.isEmpty()) return;
+        log("Looking up " + wanted.size() + " classes in " + jarPaths.size() + " jars");
+        for (Path jar : jarPaths) {
+            if (jarOfClass.size() == wanted.size()) break;
+            java.util.zip.ZipFile z = null;
+            try {
+                z = new java.util.zip.ZipFile(jar.toFile());
+                for (String c : wanted) {
+                    if (jarOfClass.containsKey(c)) continue;
+                    if (z.getEntry(c.replace('.', '/') + ".class") != null) jarOfClass.put(c, jar.getFileName().toString());
+                }
+            } catch (IOException e) {
+                // not a readable jar, skip
+            } finally {
+                if (z != null) try { z.close(); } catch (IOException ignored) { }
+            }
+        }
     }
 
     List<JMethod> actionMethods(JClass jc, String kind, String parameter) {

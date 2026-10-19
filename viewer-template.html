@@ -206,7 +206,7 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
 
   var KIND = {
     dispatch: 'DispatchAction', lookup: 'LookupDispatchAction', mapping: 'MappingDispatchAction', event: 'EventDispatchAction',
-    plain: 'Action', custom: '自訂分派（推測）', forward: '直接轉向', include: '直接 include', builtin: 'Struts 內建', missing: '找不到原始碼', unknown: '未指定類別'
+    plain: 'Action', custom: '自訂分派（推測）', forward: '直接轉向', include: '直接 include', builtin: 'Struts 內建', missing: '找不到原始碼', jar: '位於 jar（無原始碼）', unknown: '未指定類別'
   };
   var WARN = {
     'fwd-undefined': ['程式使用了未定義的 forward', '程式碼呼叫 findForward() 的名稱，在該 Action 和 global-forwards 都找不到，執行時會回傳 null。'],
@@ -300,7 +300,7 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
   }
   function kindBadge(a) {
     var k = KIND[a.kind] || a.kind;
-    var cls = a.kind === 'missing' || a.kind === 'unknown' ? 'b bad' : (a.kind === 'custom' ? 'b warn' : 'b act');
+    var cls = a.kind === 'missing' || a.kind === 'unknown' ? 'b bad' : (a.kind === 'custom' || a.kind === 'jar' ? 'b warn' : 'b act');
     return '<span class="' + cls + '">' + esc(k) + '</span>';
   }
   function sessionBadge(a) {
@@ -350,7 +350,7 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
         push('<a class="row' + (state.cur === key ? ' on' : '') + '" href="#action/' + enc(a.id) + '"><div class="r1">' + esc(a.url) + '</div><div class="r2">' +
           '<span>' + esc(short(a.cls) || KIND[a.kind] || '') + '</span>' +
           (ms ? '<span>· ' + ms + ' 方法</span>' : '') + (sps ? '<span>· ' + sps + ' SP</span>' : '') +
-          (a.kind === 'missing' ? '<span class="b bad">無原始碼</span>' : '') + '</div></a>');
+          (a.kind === 'missing' ? '<span class="b bad">無原始碼</span>' : '') + (a.kind === 'jar' ? '<span class="b warn">jar</span>' : '') + '</div></a>');
       });
     } else if (state.tab === 'sp') {
       spNames.forEach(function (nm) {
@@ -481,6 +481,7 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
     var at = [];
     at.push(attr('設定位置', loc(a.configFile, a.configLine) || '—'));
     if (a.proxy) at.push(attr('struts-config 的 type', '<span class="mono">' + esc(a.type || '（由 RequestProcessor 代理）') + '</span>'));
+    if (a.jar) at.push(attr('類別所在 jar', '<span class="mono">' + esc(a.jar) + '</span><span class="faint">　沒有原始碼，無法往下追蹤</span>'));
     if (a.base) at.push(attr('框架基底類別', '<span class="mono">' + esc(a.base) + '</span>'));
     if (a.parameter) at.push(attr('parameter', '<span class="mono">' + esc(a.parameter) + '</span>' + (a.kind === 'dispatch' ? '<span class="faint">　依此參數值決定呼叫的方法</span>' : '')));
     if (a.form) {
