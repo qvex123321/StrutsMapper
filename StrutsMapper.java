@@ -94,6 +94,9 @@ public class StrutsMapper {
         List<String[]> spHits = new ArrayList<String[]>(); // {name, kind}
         Set<String> tables = new LinkedHashSet<String>();
         List<String> fwdNames = new ArrayList<String>();
+        List<String> fwdPrefixes = new ArrayList<String>();
+        List<String> spArgs = new ArrayList<String>();
+        List<String> procArgs = new ArrayList<String>();
         List<String> fwdPaths = new ArrayList<String>();
         List<String> sessionSet = new ArrayList<String>();
         List<String> sessionGet = new ArrayList<String>();
@@ -549,6 +552,7 @@ public class StrutsMapper {
             a.id = a.fullPath;
             a.type = attr(ae, "type");
             a.form = attr(ae, "name");
+            if (a.form != null && a.form.isEmpty()) a.form = null;
             a.scope = attr(ae, "scope");
             if (a.scope == null && a.form != null) {
                 a.scope = "session";
@@ -696,6 +700,7 @@ public class StrutsMapper {
     static final Pattern P_ANNOT = Pattern.compile("@[A-Za-z_$][\\w$.]*(?:\\s*\\([^()]*\\))?");
     static final Pattern P_LOCAL = Pattern.compile("(?<![\\w$.])([A-Z][\\w$]*(?:\\.[A-Z][\\w$]*)*(?:\\s*\\[\\s*\\])*)\\s+([a-z_$][\\w$]*)\\s*(?=[=;:,)])");
     static final Pattern P_CAST_CALL = Pattern.compile("\\(\\s*\\(\\s*([A-Z][\\w$]*(?:\\.[\\w$]+)*)\\s*\\)");
+    static final Pattern P_BEAN_ANNOT = Pattern.compile("@(?:Component|Controller|Service|Repository|Named)\\s*\\(\\s*(?:value\\s*=\\s*)?\"([^\"]+)\"");
     static final Pattern P_FIND_FWD = Pattern.compile("\\bfindForward\\s*\\(\\s*\"");
     static final Pattern P_NEW_FWD = Pattern.compile("\\bnew\\s+ActionForward\\s*\\(\\s*\"");
     static final Pattern P_ATTR = Pattern.compile("([\\w$.()]+?)\\s*\\.\\s*(setAttribute|getAttribute|removeAttribute)\\s*\\(\\s*\"");
@@ -789,6 +794,8 @@ public class StrutsMapper {
             int ps = Math.max(Math.max(m.lastIndexOf(';', st), m.lastIndexOf('}', st)), 0);
             String pre = m.substring(ps, st);
             c.isAbstract = c.isInterface || pre.matches("(?s).*\\babstract\\b.*");
+            Matcher bn = P_BEAN_ANNOT.matcher(src.substring(ps, st));
+            while (bn.find()) if (!springBeans.containsKey(bn.group(1))) springBeans.put(bn.group(1), c.fqn);
             Matcher em = P_EXTENDS.matcher(header);
             List<String> ext = new ArrayList<String>();
             if (em.find()) for (String s : em.group(1).split(",")) if (!s.trim().isEmpty()) ext.add(s.trim());
@@ -1244,12 +1251,22 @@ public class StrutsMapper {
         for (String s : strings) {
             detectSp(s, jm.spHits);
             detectTables(s, jm.tables);
+            String t = s.trim();
+            if (P_SPNAME.matcher(t).matches() && t.indexOf('_') >= 0) addU(jm.spArgs, t);
+            else if (P_PROCNAME.matcher(t).matches()) addU(jm.procArgs, t);
         }
 
         Matcher fm = P_FIND_FWD.matcher(body);
         while (fm.find()) {
             JLit l = c.litMap.get(bs + fm.end() - 1);
-            if (l != null) addU(jm.fwdNames, l.value);
+            if (l == null) continue;
+            int q = skipWs(m, l.end + 1);
+            boolean concat = q < m.length() && m.charAt(q) == '+';
+            if (concat) {
+                if (!l.value.isEmpty()) addU(jm.fwdPrefixes, l.value);
+            } else if (!l.value.isEmpty()) {
+                addU(jm.fwdNames, l.value);
+            }
         }
         fm = P_NEW_FWD.matcher(body);
         while (fm.find()) {
@@ -1386,7 +1403,10 @@ public class StrutsMapper {
     // ------------------------------------------------------------------ SQL / SP detection
 
     static final String ID = "[A-Za-z][\\w$#]*";
-    static final Pattern P_SP_CALL = Pattern.compile("(?i)(?:\\{\\s*(?:\\?\\s*=\\s*)?|^\\s*)call\\s+(" + ID + "(?:\\." + ID + "){0,2})(\\.?)");
+    static final Pattern P_SP_CALL = Pattern.compile("(?i)\\{\\s*(?:\\?\\s*=\\s*)?call\\s+(" + ID + "(?:\\." + ID + "){0,2})(\\.?)");
+    static final Pattern P_SP_BARE = Pattern.compile("(?i)^\\s*call\\s+(" + ID + "(?:\\." + ID + "){0,2})\\s*(?:\\(|;?\\s*$)");
+    static final Pattern P_SPNAME = Pattern.compile("^[A-Z][A-Z0-9_$#]*(?:\\.[A-Z][A-Z0-9_$#]*){1,2}$");
+    static final Pattern P_PROCNAME = Pattern.compile("^[A-Z][A-Z0-9$#]*_[A-Z0-9_$#]+$");
     static final Pattern P_SP_BEGIN = Pattern.compile("(?i)\\bbegin\\s+(?:\\?\\s*:=\\s*)?(" + ID + "(?:\\." + ID + "){0,2})\\s*(?:\\(|;)");
     static final Pattern P_SP_FUNC = Pattern.compile("(?<![\\w$#.])(" + ID + "\\." + ID + "(?:\\." + ID + ")?)\\s*\\(");
     static final Pattern P_SP_OPEN = Pattern.compile("(?i)(?:\\{\\s*(?:\\?\\s*=\\s*)?|^\\s*)call\\s*$");
@@ -1414,6 +1434,11 @@ public class StrutsMapper {
             String nm = m.group(1).toUpperCase(Locale.ROOT);
             if (".".equals(m.group(2))) addSp(out, nm + ".*", "dynamic");
             else addSp(out, nm, "call");
+            found = true;
+        }
+        m = P_SP_BARE.matcher(s);
+        if (m.find()) {
+            addSp(out, m.group(1).toUpperCase(Locale.ROOT), "call");
             found = true;
         }
         m = P_SP_BEGIN.matcher(s);
@@ -1480,6 +1505,20 @@ public class StrutsMapper {
             analyze(m);
             for (String[] h : m.spHits) {
                 if (!r.sps.containsKey(h[0])) r.sps.put(h[0], new Object[] {h[1], pathTo(parent, m)});
+                if (!"dynamic".equals(h[1])) continue;
+                // the SP name is built at runtime: look for SP-like literals passed down along the call path
+                String pkg = h[0].endsWith(".*") ? h[0].substring(0, h[0].length() - 2) : null;
+                for (JMethod x : pathTo(parent, m)) {
+                    for (String arg : x.spArgs) {
+                        if (pkg != null && !arg.startsWith(pkg + ".")) continue;
+                        if (!r.sps.containsKey(arg)) r.sps.put(arg, new Object[] {"arg", pathTo(parent, x)});
+                    }
+                    if (pkg == null) continue;
+                    for (String proc : x.procArgs) {
+                        String full = pkg + "." + proc;
+                        if (!r.sps.containsKey(full)) r.sps.put(full, new Object[] {"arg", pathTo(parent, x)});
+                    }
+                }
             }
             r.tables.addAll(m.tables);
             int d = depth.get(m);
@@ -1861,6 +1900,16 @@ public class StrutsMapper {
         }
         scanJars(missing);
 
+        // forward names defined by every mapping that uses the same class
+        Map<String, Set<String>> clsForwards = new HashMap<String, Set<String>>();
+        for (ActionDef a : actions) {
+            String c = actionClass(a);
+            if (c == null) continue;
+            Set<String> set = clsForwards.get(c);
+            if (set == null) clsForwards.put(c, set = new HashSet<String>());
+            for (Forward f : a.forwards) set.add(f.name);
+        }
+
         int done = 0;
         for (ActionDef a : actions) {
             if (++done % 200 == 0) log("Tracing actions " + done + " / " + actions.size());
@@ -2017,8 +2066,13 @@ public class StrutsMapper {
                             sc = "global";
                         }
                         if (def == null) {
-                            sc = "undefined";
-                            warn("fwd-undefined", "action", a.id, "method", jm.name, "forward", fn);
+                            Set<String> shared = clsForwards.get(clsName);
+                            if (shared != null && shared.contains(fn)) {
+                                sc = "other-mapping";
+                            } else {
+                                sc = "undefined";
+                                warn("fwd-undefined", "action", a.id, "method", jm.name, "forward", fn);
+                            }
                         } else {
                             f.put("target", target(def.contextRelative ? "" : a.module, def.path));
                         }
@@ -2027,6 +2081,22 @@ public class StrutsMapper {
                         List<String> ub = usedBy.get(fn);
                         if (ub == null) usedBy.put(fn, ub = new ArrayList<String>());
                         addU(ub, jm.name);
+                    }
+                    for (String pre : jm.fwdPrefixes) {
+                        List<Forward> cand = new ArrayList<Forward>(local.values());
+                        cand.addAll(global.values());
+                        for (Forward def : cand) {
+                            if (def.name == null || !def.name.startsWith(pre)) continue;
+                            Map<String, Object> f = new LinkedHashMap<String, Object>();
+                            f.put("name", def.name);
+                            f.put("scope", local.containsKey(def.name) ? "local" : "global");
+                            f.put("prefix", pre);
+                            f.put("target", target(def.contextRelative ? "" : a.module, def.path));
+                            fw.add(f);
+                            List<String> ub = usedBy.get(def.name);
+                            if (ub == null) usedBy.put(def.name, ub = new ArrayList<String>());
+                            addU(ub, jm.name);
+                        }
                     }
                     mo.put("forwards", fw);
                     List<Map<String, Object>> fp = new ArrayList<Map<String, Object>>();
@@ -2041,6 +2111,8 @@ public class StrutsMapper {
                     mo.put("paths", fp);
 
                     Reach r = reach(jm, jc.fqn);
+                    boolean hasArg = false;
+                    for (Object[] v : r.sps.values()) if ("arg".equals(v[0])) hasArg = true;
                     List<Map<String, Object>> sps = new ArrayList<Map<String, Object>>();
                     for (Map.Entry<String, Object[]> e : r.sps.entrySet()) {
                         Map<String, Object> so = new LinkedHashMap<String, Object>();
@@ -2050,7 +2122,7 @@ public class StrutsMapper {
                         List<JMethod> path = (List<JMethod>) e.getValue()[1];
                         so.put("via", viaJson(path));
                         sps.add(so);
-                        if ("dynamic".equals(e.getValue()[0])) {
+                        if ("dynamic".equals(e.getValue()[0]) && !hasArg) {
                             JMethod last = path.get(path.size() - 1);
                             warn("sp-dynamic", "action", a.id, "method", jm.name, "sp", e.getKey(),
                                     "file", last.owner.file, "line", String.valueOf(last.line));

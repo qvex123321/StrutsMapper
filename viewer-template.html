@@ -152,6 +152,10 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
 .via span[title]:hover{color:var(--ink)}
 .arrow{color:var(--faint);margin:0 2px}
 
+.btn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border:1px solid var(--line2);border-radius:7px;background:var(--panel);color:var(--ink);font-size:13px;cursor:pointer}
+.btn:hover{background:var(--hover)}
+.btn svg{width:14px;height:14px;stroke:currentColor}
+.hrow{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .note{font-size:12.5px;color:var(--muted);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin-top:10px}
 .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:7px 14px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
 .toast.show{opacity:1}
@@ -215,7 +219,7 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
     'bean-missing': ['找不到 Spring bean', '使用 DelegatingActionProxy，但 Spring 設定中沒有對應 path 名稱的 bean。'],
     'form-missing': ['找不到 form-bean', 'Action 指定的 name 在 form-beans 中沒有定義。'],
     'sp-dynamic': ['SP 名稱為動態組成', '呼叫字串是拼接出來的，工具無法確定實際呼叫哪支程序，需要人工確認。'],
-    'config-unregistered': ['設定檔未在 web.xml 註冊', '這份 struts-config 沒有被 ActionServlet 載入，可能是遺留檔案。'],
+    'config-unregistered': ['設定檔未被載入', '在 web.xml 和 Spring 設定中都找不到載入這份 struts-config 的地方，可能是遺留檔案，或用了工具不認得的載入方式。'],
     'dup-action': ['Action path 重複定義', '同一個 path 出現在多份設定檔中。'],
     'xml-parse': ['XML 解析失敗', '檔案格式有誤，已略過。'],
     'java-parse': ['Java 解析失敗', '檔案解析時發生錯誤，已略過。']
@@ -359,7 +363,7 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
         var key = 'sp/' + nm;
         push('<a class="row' + (state.cur === key ? ' on' : '') + '" href="#sp/' + enc(nm) + '"><div class="r1">' + esc(spName(nm)) + '</div><div class="r2">' +
           '<span>' + s._acts + ' 個 Action</span>' + (s.jsps.length ? '<span>· ' + s.jsps.length + ' 個 JSP 直接呼叫</span>' : '') +
-          (s.kind === 'dynamic' ? '<span class="b warn">動態</span>' : '') + (s.kind === 'func' ? '<span class="b">function</span>' : '') + '</div></a>');
+          (s.kind === 'dynamic' ? '<span class="b warn">動態</span>' : '') + (s.kind === 'func' ? '<span class="b">function</span>' : '') + (s.kind === 'arg' ? '<span class="b warn">推測</span>' : '') + '</div></a>');
       });
     } else if (state.tab === 'jsp') {
       jspPaths.forEach(function (p) {
@@ -430,7 +434,7 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
       h.push('<h2>被最多 Action 使用的 SP <span class="n">前 ' + top.length + ' 名</span></h2><table class="t"><tr><th>SP</th><th>類型</th><th style="text-align:right">Action 數</th><th style="text-align:right">呼叫處</th></tr>');
       top.forEach(function (n) {
         var s = D.sps[n];
-        h.push('<tr class="click" data-href="#sp/' + enc(n) + '"><td class="mono">' + esc(spName(n)) + '</td><td>' + (s.kind === 'func' ? 'function' : s.kind === 'dynamic' ? '動態' : 'procedure') + '</td><td class="num">' + s._acts + '</td><td class="num">' + (s.callers.length + s.jsps.length) + '</td></tr>');
+        h.push('<tr class="click" data-href="#sp/' + enc(n) + '"><td class="mono">' + esc(spName(n)) + '</td><td>' + (s.kind === 'func' ? 'function' : s.kind === 'dynamic' ? '動態' : s.kind === 'arg' ? '推測' : 'procedure') + '</td><td class="num">' + s._acts + '</td><td class="num">' + (s.callers.length + s.jsps.length) + '</td></tr>');
       });
       h.push('</table>');
     }
@@ -507,12 +511,13 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
           '<span class="hint">' + esc(m.urlHint) + '</span></div>');
         var fw = (m.forwards || []).map(function (f) {
           return '<div style="margin-bottom:4px"><span class="pill static">' + esc(f.name) + '</span>' + (f.scope === 'global' ? ' <span class="b">global</span>' : '') +
-            (f.scope === 'undefined' ? ' <span class="b bad">未定義</span>' : ' <span class="arrow">→</span> ' + targetHtml(f.target)) + '</div>';
+            (f.prefix ? ' <span class="b" title="程式以字串拼接 forward 名稱，依開頭比對">開頭為 ' + esc(f.prefix) + '</span>' : '') +
+            (f.scope === 'undefined' ? ' <span class="b bad">未定義</span>' : f.scope === 'other-mapping' ? ' <span class="b" title="同一個類別被多個 mapping 共用，這個 forward 定義在其他 mapping，本 mapping 執行時通常不會走到">由其他 mapping 定義</span>' : ' <span class="arrow">→</span> ' + targetHtml(f.target)) + '</div>';
         }).concat((m.paths || []).map(function (p) { return '<div><span class="b">new ActionForward</span> ' + targetHtml(p.target) + '</div>'; }));
         h.push('<div class="mrow"><div class="k">轉向</div><div>' + (fw.length ? fw.join('') : '<span class="faint">程式中沒有偵測到 findForward（可能在共用方法中處理）</span>') + '</div></div>');
         var sps = m.sps || [];
         h.push('<div class="mrow"><div class="k">資料庫程序</div><div>' + (sps.length ? sps.map(function (s) {
-          return '<div class="spitem"><div>' + spLink(s.name) + (s.kind === 'func' ? ' <span class="b">function</span>' : '') + (s.kind === 'dynamic' ? ' <span class="b warn">動態組成，需人工確認</span>' : '') + '</div>' + viaHtml(s.via) + '</div>';
+          return '<div class="spitem"><div>' + spLink(s.name) + (s.kind === 'func' ? ' <span class="b">function</span>' : '') + (s.kind === 'dynamic' ? ' <span class="b warn">動態組成，需人工確認</span>' : '') + (s.kind === 'arg' ? ' <span class="b warn" title="SQL 字串是動態組成，這個名稱是從呼叫路徑上傳入的字串推測">由參數推測</span>' : '') + '</div>' + viaHtml(s.via) + '</div>';
         }).join('') : '<span class="faint">沒有偵測到</span>') + (m.truncated ? '<div class="b warn" style="margin-top:6px">呼叫鏈過大，已截斷</div>' : '') + '</div></div>');
         if ((m.tables || []).length) h.push('<div class="mrow"><div class="k">SQL 資料表</div><div class="pills">' + m.tables.map(function (t) { return '<span class="pill static">' + esc(t) + '</span>'; }).join('') + '</div></div>');
         var ss = m.session || {};
@@ -660,7 +665,7 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
     var h = [];
     h.push('<div class="eyebrow">資料庫程序</div><h1 class="mono">' + esc(spName(name)) + '</h1>');
     var parts = name.split('.');
-    h.push('<div class="sub">' + (s.kind === 'func' ? '<span class="b">function（在 SQL 中呼叫）</span>' : s.kind === 'dynamic' ? '<span class="b warn">名稱為動態組成</span>' : '<span class="b sp">procedure 呼叫</span>') +
+    h.push('<div class="sub">' + (s.kind === 'func' ? '<span class="b">function（在 SQL 中呼叫）</span>' : s.kind === 'dynamic' ? '<span class="b warn">名稱為動態組成</span>' : s.kind === 'arg' ? '<span class="b warn">由傳入參數推測，請人工確認</span>' : '<span class="b sp">procedure 呼叫</span>') +
       (parts.length >= 2 ? '<span>package <span class="mono">' + esc(parts.slice(0, -1).join('.')) + '</span></span>' : '') +
       '<span>' + s._acts + ' 個 Action、' + s.callers.length + ' 個方法' + (s.jsps.length ? '、' + s.jsps.length + ' 個 JSP' : '') + '</span></div>');
     if (parts.length >= 2 && s.kind !== 'dynamic') {
@@ -704,7 +709,8 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
   }
 
   function viewWarnings() {
-    var h = ['<div class="eyebrow">警告</div><h1>需要確認的地方</h1><div class="sub">' + warns.length + ' 筆</div>'];
+    var h = ['<div class="eyebrow">警告</div><div class="hrow"><div><h1>需要確認的地方</h1><div class="sub">' + warns.length + ' 筆</div></div>' +
+      (warns.length ? '<button class="btn" data-export="warnings"><svg viewBox="0 0 16 16" fill="none" stroke-width="1.6"><path d="M8 2v8M4.5 6.5L8 10l3.5-3.5M3 13h10"/></svg>匯出 CSV</button>' : '') + '</div>'];
     var groups = {};
     warns.forEach(function (w) { (groups[w.type] = groups[w.type] || []).push(w); });
     Object.keys(groups).forEach(function (k) {
@@ -716,6 +722,39 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
     if (!warns.length) h.push('<div class="empty">沒有警告</div>');
     return h.join('');
   }
+
+  // ---------- export ----------
+  function csvCell(v) {
+    var t = v == null ? '' : String(v);
+    return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+  }
+  function exportWarnings() {
+    var cols = ['類型', '代碼', 'Action', 'URL', '方法', 'forward', '路徑', 'SP', '類別', 'Form', '檔案', '行號', '其他'];
+    var rows = [cols.join(',')];
+    warns.forEach(function (w) {
+      var a = w.action && byId[w.action];
+      var other = w.type === 'dup-action' ? (w.file + ' / ' + w.other) : (w.error || '');
+      rows.push([
+        WARN[w.type] ? WARN[w.type][0] : w.type, w.type, w.action || '', a ? a.url : '', w.method || '', w.forward || '',
+        w.path || '', w.sp || '', w.cls || '', w.form || '', w.type === 'dup-action' ? '' : (w.file || ''), w.line || '', other
+      ].map(csvCell).join(','));
+    });
+    // BOM so Excel opens the UTF-8 file with Chinese intact
+    var blob = new Blob(['\ufeff' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.href = url;
+    link.download = 'struts-map-warnings.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+    toast('已匯出 ' + warns.length + ' 筆警告');
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-export]');
+    if (b && b.getAttribute('data-export') === 'warnings') exportWarnings();
+  });
 
   // ---------- routing ----------
   function route() {
