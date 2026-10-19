@@ -9,19 +9,56 @@
 | `StrutsMapper.java` | 解析工具。Java 8 以上即可執行，不需要任何外部 jar。原始碼刻意只用英文字元，不受 Eclipse 編碼設定影響。 |
 | `viewer-template.html` | 頁面範本，必須和 `StrutsMapper.java` 放在同一個資料夾。 |
 
+## 先了解：兩個專案
+
+這個工具要放在**另外新開的專案**裡執行，不要放進要分析的專案。要分析的專案只會被讀取，不會被修改，路徑透過參數指定即可。
+
+```
+D:\tools\struts-mapper\          ← 新開的專案，放工具
+└── src\
+    ├── StrutsMapper.java
+    └── viewer-template.html
+
+D:\workspace\target-project\      ← 要分析的專案，不需要修改
+```
+
 ## 在 Eclipse 執行
 
 1. **File → New → Java Project**，名稱自訂（例如 `struts-mapper`），JRE 選 Java 8 以上。
-2. 把 `StrutsMapper.java` 和 `viewer-template.html` 複製到這個專案的 `src` 底下，**直接放在 src，不要建 package**。
+2. 把 `StrutsMapper.java` 和 `viewer-template.html` 複製到**剛建立的這個新專案**的 `src` 底下，直接放在 src，不要建 package。要分析的專案不需要放任何檔案，也不用修改。
 3. 對 `StrutsMapper.java` 按右鍵 → **Run As → Run Configurations…** → 左側 Java Application 新增一組。
 4. **Arguments** 分頁的 Program arguments 填入：
    ```
-   "D:\workspace\你的專案" "D:\struts-map\struts-map.html"
+   "D:\workspace\target-project" "D:\struts-map\struts-map.html"
    ```
    第一個是要掃描的專案根目錄，第二個是輸出位置（可省略，預設輸出到工作目錄的 `struts-map.html`）。
 5. 按 **Run**。Console 出現 `Done` 後，用 Chrome 或 Edge 開啟產生的 HTML。
 
 專案很大時，可在同一個視窗的 **VM arguments** 加上 `-Xmx1g`。
+
+## 在 IntelliJ IDEA 執行
+
+1. **File → New → Project**，選 **Java**，Build system 選 **IntelliJ**（不需要 Maven 或 Gradle），JDK 選 8 以上。不要勾選產生範例程式碼。
+2. 把 `StrutsMapper.java` 和 `viewer-template.html` 複製到**剛建立的這個新專案**的 `src` 底下，直接放在 src，不要建 package。要分析的專案不需要放任何檔案，也不用修改。
+3. 在 `StrutsMapper.java` 的 `main` 方法旁點綠色箭頭 → **Run 'StrutsMapper.main()'**。第一次執行沒有參數，Console 只會印出用法，這是正常的，目的是先建立一組執行設定。
+4. 右上角執行設定下拉選單 → **Edit Configurations…**，選 `StrutsMapper`，在 **Program arguments** 填入：
+   ```
+   "D:\workspace\target-project" "D:\struts-map\struts-map.html"
+   ```
+5. 按 **OK** 再執行一次。Console 出現 `Done` 後，用 Chrome 或 Edge 開啟產生的 HTML。
+
+需要加 `-Xmx1g` 或下面的選項時，填在同一個視窗的 **VM options**。新版 IntelliJ 預設隱藏這個欄位，要點 **Modify options → Add VM options** 才會出現。
+
+如果 Console 顯示找不到 `viewer-template.html`，把它再複製一份到專案根目錄（也就是執行設定裡的 Working directory）即可。
+
+## 用命令列執行
+
+如果電腦上有 JDK 的 `javac`，也可以不開 IDE。在兩個檔案所在的資料夾執行：
+
+```
+javac StrutsMapper.java
+java -cp . StrutsMapper "D:\workspace\target-project" "D:\struts-map\struts-map.html"
+```
 
 ## 輸出
 
